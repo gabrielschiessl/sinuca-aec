@@ -1,0 +1,147 @@
+/* Botão principal */
+
+.btn {
+  border: none;
+
+  cursor: pointer;
+
+  padding: 14px 28px;
+
+  border-radius: var(--radius);
+
+  background: var(--primary);
+
+  color: white;
+
+  font-size: 16px;
+
+  font-weight: 600;
+
+  transition: var(--transition);
+
+  min-height: 56px;
+}
+
+.btn:hover {
+  background: var(--primary-dark);
+}
+
+/* Botão grande */
+
+.btn-large {
+  width: 100%;
+
+  max-width: var(--button-max-width);
+
+  height: 60px;
+
+  font-size: 18px;
+}
+
+.btn-outline {
+  background: white;
+
+  color: var(--primary);
+
+  border: none;
+
+  min-height: 44px;
+
+  padding: 10px 18px;
+}
+
+.btn-outline:hover {
+  background: var(--primary-dark);
+
+  color: white;
+}
+
+.icon-button {
+  width: 44px;
+
+  height: 44px;
+
+  background: none;
+
+  border: none;
+
+  color: white;
+
+  cursor: pointer;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  transition: 0.25s;
+}
+
+.icon-button i {
+  font-size: 30px;
+}
+
+.icon-button:hover {
+  transform: scale(1.12);
+
+  opacity: 0.8;
+}
+
+.menu-button {
+  width: 100%;
+
+  max-width: 520px;
+
+  height: 72px;
+
+  display: grid;
+
+  grid-template-columns: 70px 1fr;
+
+  align-items: center;
+
+  padding: 0 24px;
+
+  border: none;
+
+  border-radius: 16px;
+
+  background: var(--primary);
+
+  color: white;
+
+  cursor: pointer;
+
+  transition: 0.25s;
+}
+
+.menu-button:hover {
+  background: var(--primary-dark);
+
+  transform: translateX(6px);
+}
+
+.menu-button span {
+  font-size: 22px;
+
+  font-weight: 600;
+
+  text-align: center;
+
+  transform: translateX(-35px);
+}
+
+.menu-button i {
+  font-size: 34px;
+
+  justify-self: center;
+}
+
+.trophy-gold {
+  color: #d4af37;
+}
+
+.trophy-silver {
+  color: #c0c0c0;
+}

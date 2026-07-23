@@ -1,0 +1,117 @@
+.home-container {
+  display: flex;
+
+  flex-direction: column;
+
+  min-height: calc(100vh - var(--header-height));
+}
+
+main {
+  flex: 1;
+
+  display: flex;
+
+  flex-direction: column;
+}
+
+.hero {
+  flex: 1;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  justify-content: flex-start;
+
+  padding: 40px 20px 30px;
+
+  position: relative;
+
+  overflow: hidden;
+}
+
+.hero::before {
+  content: "";
+
+  position: absolute;
+
+  inset: 0;
+
+  background: url("../assets/images/esporte_icone_grena.png") center center
+    no-repeat;
+
+  background-size: 95%;
+
+  opacity: 0.03;
+
+  pointer-events: none;
+}
+
+.hero h1 {
+  font-size: clamp(2rem, 6vw, 3rem);
+}
+
+.hero p {
+  font-size: clamp(1rem, 3vw, 1.2rem);
+}
+
+.buttons {
+  width: 100%;
+
+  max-width: 560px;
+
+  margin-top: 30px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  gap: 18px;
+}
+
+.hero-logo {
+  width: 430px;
+
+  max-width: 90%;
+
+  margin-top: var(--hero-top-spacing);
+
+  margin-bottom: 16px;
+}
+
+.hero-subtitle {
+  color: var(--primary);
+
+  opacity: 0.75;
+
+  font-size: clamp(1rem, 3vw, 1.2rem);
+
+  font-weight: 500;
+
+  margin-bottom: 84px;
+}
+
+footer {
+  margin-top: auto;
+
+  padding: 18px 0;
+
+  text-align: center;
+
+  color: var(--primary);
+
+  opacity: 0.75;
+
+  font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .hero {
+    padding: 20px;
+  }
+
+}
