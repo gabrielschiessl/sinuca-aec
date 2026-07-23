@@ -138,10 +138,266 @@
   justify-self: center;
 }
 
-.trophy-gold {
-  color: #d4af37;
+/* ABAS DO CAMPEONATO */
+
+.tabs {
+  width: 100%;
+
+  display: flex;
+
+  justify-content: center;
+
+  gap: 8px;
+
+  margin-bottom: 24px;
+
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
 }
 
-.trophy-silver {
-  color: #c0c0c0;
+.tab-button {
+  flex: 1;
+
+  max-width: 180px;
+
+  height: 48px;
+
+  border: none;
+
+  background: transparent;
+
+  color: var(--text-color);
+
+  font-size: 16px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  position: relative;
+
+  transition: 0.25s;
+}
+
+.tab-button:hover {
+  color: var(--primary);
+}
+
+/* aba selecionada */
+
+.tab-button.active {
+  color: var(--primary);
+}
+
+/* linha inferior */
+
+.tab-button.active::after {
+  content: "";
+
+  position: absolute;
+
+  bottom: -2px;
+
+  left: 20%;
+
+  width: 60%;
+
+  height: 3px;
+
+  background: var(--primary);
+
+  border-radius: 10px;
+}
+
+.match-card {
+  display: grid;
+
+  grid-template-columns: 1fr;
+
+  justify-items: center;
+
+  gap: 8px;
+}
+
+.player {
+  font-weight: 600;
+}
+
+.player-left {
+  order: 1;
+}
+
+.score {
+  order: 2;
+}
+
+.player-right {
+  order: 3;
+}
+.score-input {
+  width: 45px;
+
+  height: 36px;
+
+  text-align: center;
+
+  border-radius: 8px;
+
+  border: 1px solid #ccc;
+}
+
+.serie-page {
+  width: 100%;
+
+  max-width: 900px;
+
+  margin: 0 auto;
+
+  padding: 20px;
+}
+
+.round-card {
+  background: var(--primary);
+
+  color: white;
+
+  border-radius: 18px;
+
+  padding: 20px;
+
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+}
+
+.round-card h3 {
+  color: white;
+
+  font-size: 22px;
+
+  margin-bottom: 16px;
+}
+
+.round-select {
+  width: 100%;
+
+  height: 42px;
+
+  padding: 0 14px;
+
+  border-radius: 10px;
+
+  border: 1px solid rgba(0, 0, 0, 0.15);
+
+  background: white;
+
+  color: var(--text-color);
+
+  font-size: 15px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.round-select:focus {
+  border-color: var(--primary);
+}
+
+.filters {
+  width: 100%;
+
+  display: flex;
+
+  justify-content: center;
+
+  gap: 24px;
+
+  margin-bottom: 25px;
+
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 8px;
+
+  width: 260px;
+}
+
+.filter-title {
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  color: var(--primary-light);
+
+  font-size: 15px;
+
+  font-weight: 600;
+}
+
+.filter-title i {
+  font-size: 18px;
+}
+
+@media (max-width: 768px) {
+  .tabs {
+    position: sticky;
+
+    bottom: 0;
+
+    background: var(--background);
+
+    padding: 8px;
+
+    border-top: 1px solid #ddd;
+
+    border-bottom: none;
+  }
+
+  .tab-button {
+    font-size: 14px;
+  }
+
+  .match-card {
+    grid-template-columns: 1fr;
+
+    gap: 10px;
+
+    text-align: center;
+
+    min-height: 80px;
+  }
+
+  .match-card.admin-mode {
+    border: 2px solid var(--primary);
+  }
+
+  .player-left,
+  .player-right {
+    text-align: center;
+  }
+
+  .score {
+    order: 3;
+  }
+
+  .filters {
+    flex-direction: column;
+
+    align-items: stretch;
+
+    gap: 18px;
+  }
+
+  .filter-group {
+    width: 100%;
+  }
+
+  .round-select {
+    max-width: none;
+  }
 }

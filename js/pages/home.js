@@ -1,5 +1,7 @@
 import { renderNavbar } from "../components/navbar.js";
 import { renderFooter } from "../components/footer.js";
+import { navigate } from "../router.js";
+import { menuButton } from "../components/menuButton.js";
 
 export function renderHome() {
   const app = document.getElementById("app");
@@ -15,21 +17,18 @@ ${renderNavbar()}
 
     <div class="buttons">
 
-    <button class="menu-button">
+    ${menuButton({
+      route: "/serie-a",
+      icon: "bi bi-trophy-fill",
+      text: "Série A",
+    })}
 
-        <i class="bi bi-trophy-fill"></i>
 
-        <span>Série A</span>
-
-    </button>
-
-    <button class="menu-button">
-
-        <i class="bi bi-award-fill"></i>
-
-        <span>Série B</span>
-
-    </button>
+    ${menuButton({
+      route: "/serie-b",
+      icon: "bi bi-award-fill",
+      text: "Série B",
+    })}
 
 </div>
   </section>

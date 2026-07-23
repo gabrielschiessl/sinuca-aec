@@ -1,3 +1,3 @@
-import { renderHome } from "./pages/home.js";
+import { router } from "./router.js";
 
-renderHome();
+router();
