@@ -1,0 +1,26 @@
+:root {
+    /* Cores principais */
+    --color-primary: #653245;
+    --color-primary-hover: #522838;
+    --color-primary-light: #7B4257;
+
+    /* Neutras */
+    --color-background: #F8F8F8;
+    --color-surface: #FFFFFF;
+
+    /* Texto */
+    --color-text: #2E2E2E;
+    --color-text-secondary: #666666;
+
+    /* Bordas */
+    --color-border: #E5E5E5;
+
+    /* Sombras */
+    --shadow: 0 8px 25px rgba(0,0,0,.08);
+
+    /* Bordas */
+    --radius: 14px;
+
+    /* Transições */
+    --transition: .25s ease;
+}
