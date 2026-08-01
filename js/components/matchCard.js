@@ -1,57 +1,66 @@
-export function matchCard({
-  id,
-  jogador1,
-  jogador2,
-  placar1,
-  placar2,
-  admin = false,
-}) {
-  const resultado =
-    placar1 === "-" || placar2 === "-" ? "- x -" : `${placar1} x ${placar2}`;
+import { statusBadge } from "./statusBadge.js";
+import { scoreBox } from "./scoreBox.js";
+import { matchFooter } from "./matchFooter.js";
+import { formatDateTime } from "../utils/date.js";
 
+export function matchCard(partida) {
   return `
 
-    <div class="match-card">
+<div class="match-card ${partida.status.codigo === "V" ? "live" : ""}">
 
+    <div class="match-header">
 
-        <span class="player player-left">
-            ${jogador1}
-        </span>
+        <span>
 
+    ${formatDateTime(partida.data, partida.hora)}
 
-        ${
-          admin
-            ? `
-            <input 
-                class="score-input"
-                value="${placar1}"
-            >
+</span>
 
-            <span>
-                x
-            </span>
-
-            <input 
-                class="score-input"
-                value="${placar2}"
-            >
-            `
-            : `
-            <div class="score">
-                ${resultado}
-            </div>
-            `
-        }
-
-
-
-        <span class="player player-right">
-            ${jogador2}
-        </span>
-
-
+        ${statusBadge(partida.status)}
 
     </div>
 
-    `;
+    <div class="match-body">
+
+        <div class="player-name">
+
+            ${partida.jogador1.exibicao}
+
+        </div>
+
+        <div class="score-inputs">
+
+    ${scoreBox({
+      value: partida.placar1,
+      editable: partida.edicao.pode_editar,
+      player: "1",
+    })}
+
+    <span class="score-x">
+
+        ×
+
+    </span>
+
+    ${scoreBox({
+      value: partida.placar2,
+      editable: partida.edicao.pode_editar,
+      player: "2",
+    })}
+
+</div>
+
+        <div class="player-name">
+
+            ${partida.jogador2.exibicao}
+
+        </div>
+
+    </div>
+
+    ${matchFooter(partida.observacao)}
+
+</div>
+
+`;
 }

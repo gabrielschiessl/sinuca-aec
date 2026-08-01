@@ -1,4 +1,4 @@
-export function renderNavbar() {
+export function renderNavbar({ title = "" } = {}) {
   return `
 
 <header class="header">
@@ -8,13 +8,28 @@ export function renderNavbar() {
         <img
             src="assets/images/logo_branca.png"
             alt="AEC"
+            data-route="/"
             class="logo"
         >
 
     </div>
 
     <div class="header-center">
+        ${
+          title
+            ? `
+        <img
+            src="assets/images/esporte_icone_branco.png"
+            class="header-center-icon"
+            alt=""
+        >
 
+        <span class="header-title">
+            ${title}
+        </span>
+    `
+            : ""
+        }
     </div>
 
     <div class="header-right">

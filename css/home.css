@@ -32,23 +32,6 @@ main {
   overflow: hidden;
 }
 
-.hero::before {
-  content: "";
-
-  position: absolute;
-
-  inset: 0;
-
-  background: url("../assets/images/esporte_icone_grena.png") center center
-    no-repeat;
-
-  background-size: 95%;
-
-  opacity: 0.03;
-
-  pointer-events: none;
-}
-
 .hero h1 {
   font-size: clamp(2rem, 6vw, 3rem);
 }
@@ -84,7 +67,7 @@ main {
 }
 
 .hero-subtitle {
-  color: var(--primary);
+  color: var(--page-bg);
 
   opacity: 0.75;
 
@@ -102,11 +85,19 @@ footer {
 
   text-align: center;
 
-  color: var(--primary);
+  color: var(--page-bg);
 
   opacity: 0.75;
 
   font-size: 12px;
+  
+  background: none;
+}
+
+.footer-light {
+
+    color: var(--text-primary);
+
 }
 
 @media (max-width: 768px) {
@@ -114,4 +105,7 @@ footer {
     padding: 20px;
   }
 
+  .hero::before {
+  background-size: 95%;
+}
 }

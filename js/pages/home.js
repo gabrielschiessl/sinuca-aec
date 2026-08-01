@@ -11,7 +11,7 @@ ${renderNavbar()}
 
 <main>
   <section class="hero">
-    <img src="assets/images/esporte_grena.png" class="hero-logo" alt="Sinuca" />
+    <img src="assets/images/esporte_page-bg.png" class="hero-logo" alt="Sinuca" />
 
     <p class="hero-subtitle">Clube AEC • Temporada 2026</p>
 

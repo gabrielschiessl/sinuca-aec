@@ -10,7 +10,7 @@
 
 .header {
   height: var(--header-height);
-  background: var(--primary);
+  background: var(--panel-bg);
 
   display: flex;
   align-items: center;
@@ -21,6 +21,7 @@
   color: white;
 
   position: sticky;
+
   top: 0;
 
   z-index: 1000;
@@ -41,7 +42,31 @@
 
 .header-center {
   flex: 1;
-  justify-content: center;
+  position: absolute;
+
+  left: 50%;
+
+  transform: translateX(-50%);
+  pointer-events: none;
+  font-size: 2rem;
+
+  font-weight: 700;
+
+  max-width: 45%;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+.header-center-icon {
+  width: 40px;
+  height: 40px;
+
+  object-fit: contain;
+  margin-right: 8px;
 }
 
 .header-right {
@@ -69,9 +94,27 @@ main {
 }
 
 .logo {
-  height: 70px;
+  height: 50px;
 
   transition: 0.25s ease;
+
+  cursor: pointer;
+
+  user-select: none;
+
+  transition: transform 0.2s ease;
+}
+
+.logo:hover {
+
+    transform: scale(1.04);
+
+}
+
+.logo:active {
+
+    transform: scale(.98);
+
 }
 
 /* ===========================
@@ -85,6 +128,15 @@ main {
 
   .header-left {
     width: auto;
+  }
+
+  .header-left .logo {
+    height: 35px;
+  }
+
+  .header-center {
+    font-size: 1.7rem;
+    font-weight: 600;
   }
 
   .header-right {
@@ -101,5 +153,10 @@ main {
 
   .admin-mobile {
     display: flex;
+  }
+
+  .header-center-icon {
+    width: 30px;
+    height: 30px;
   }
 }

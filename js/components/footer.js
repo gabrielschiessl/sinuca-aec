@@ -1,11 +1,13 @@
-export function renderFooter() {
+export function renderFooter(className = "") {
+
   return `
 
-        <footer class="footer">
+    <footer class="footer ${className}">
 
-            © 2026 Gabriel Schiessl
+      © 2026 Gabriel Schiessl
 
-        </footer>
+    </footer>
 
-    `;
+  `;
+
 }

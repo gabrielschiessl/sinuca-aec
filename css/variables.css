@@ -4,7 +4,7 @@
   --primary: #653245;
   --primary-dark: #522838;
   --primary-light: #815264;
-  --primary-extralight:#d9a6b3;
+  --primary-extralight: #d9a6b3;
   --background: #f7f7f7;
   --surface: #ffffff;
 
@@ -33,4 +33,25 @@
   /* Largura máxima dos botões */
 
   --button-max-width: 420px;
+
+  /* ==========================
+    Superfícies do sistema
+  ========================== */
+
+  --page-bg: #1a0d12; /* --surface */
+  --panel-bg: #3d1e2a; /* --card */
+  --surface-darkest: #311821; /* --pitch */
+
+  --border: #5b2d3e;
+  --border-highlight: #7d5161; /* --green-mid */
+
+  --text-primary: #f1edee; /* --text */
+  --text-muted: #b197a0; /* --muted */
+  
+  --text-extralight: rgba(255,255,255,.55); /* cor do texto no tabs */
+  --accent: #714153; /* --green */
+  --group-bg: #25121b; /* Background do group-container */
+  --surface-black: #10070b; /* --dark */
+  --tab-accent: #ab2959; /* cor do tab selecionado */
+  --card-live: #220f16; /* cor do header e border do card de partida ao vivo */
 }
