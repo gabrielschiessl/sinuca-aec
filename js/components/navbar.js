@@ -1,3 +1,5 @@
+import { BASE_PATH } from "../config.js";
+
 export function renderNavbar({ title = "" } = {}) {
   return `
 
@@ -6,7 +8,7 @@ export function renderNavbar({ title = "" } = {}) {
     <div class="header-left">
 
         <img
-            src="/assets/images/logo_branca.png"
+            src="${BASE_PATH}/assets/images/logo_branca.png"
             alt="AEC"
             data-route="/"
             class="logo"
@@ -19,7 +21,7 @@ export function renderNavbar({ title = "" } = {}) {
           title
             ? `
         <img
-            src="/assets/images/esporte_icone_branco.png"
+            src="${BASE_PATH}/assets/images/esporte_icone_branco.png"
             class="header-center-icon"
             alt=""
         >
