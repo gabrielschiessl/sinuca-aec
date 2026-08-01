@@ -8,15 +8,12 @@
  ************************************************/
 
 function getParticipante(temporada, divisao, numero) {
-
   const participantes = getSheetAsObjects(SHEETS.participantes);
 
-  return participantes.find(p =>
-
-    Number(p.temporada) === Number(temporada) &&
-    p.divisao === divisao &&
-    Number(p.numero) === Number(numero)
-
+  return participantes.find(
+    (p) =>
+      Number(p.temporada) === Number(temporada) &&
+      p.divisao === divisao &&
+      Number(p.numero) === Number(numero),
   );
-
 }

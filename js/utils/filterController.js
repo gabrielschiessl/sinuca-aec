@@ -1,32 +1,65 @@
 export function initFilters() {
-  const roundFilter = document.getElementById("filter-round");
+  const roundFilter =
+    document.getElementById("filter-round");
 
-  if (!roundFilter) return;
+  const playerFilter =
+    document.getElementById("filter-player");
 
-  roundFilter.addEventListener("change", filterRounds);
+  if (!roundFilter || !playerFilter) {
+    return;
+  }
+
+  roundFilter.addEventListener(
+    "change",
+    applyFilters
+  );
+
+  playerFilter.addEventListener(
+    "change",
+    applyFilters
+  );
 }
 
-function filterRounds(event) {
+function applyFilters() {
+  const selectedRound =
+    document.getElementById("filter-round").value;
 
-    const selectedRound = event.target.value;
+  const selectedPlayer =
+    document.getElementById("filter-player").value;
 
-    const groups = document.querySelectorAll(".round-group");
+  const groups =
+    document.querySelectorAll(".round-group");
 
-    groups.forEach(group => {
+  groups.forEach((group) => {
+    const matchesRound =
+      selectedRound === "" ||
+      group.dataset.round === selectedRound;
 
-        if (
-            selectedRound === "" ||
-            group.dataset.round === selectedRound
-        ) {
+    const cards =
+      group.querySelectorAll(".match-card");
 
-            group.style.display = "";
+    let visibleCards = 0;
 
-        } else {
+    cards.forEach((card) => {
+      const matchesPlayer =
+        selectedPlayer === "" ||
+        card.dataset.player1 === selectedPlayer ||
+        card.dataset.player2 === selectedPlayer;
 
-            group.style.display = "none";
+      const shouldShow =
+        matchesRound && matchesPlayer;
 
-        }
+      card.style.display =
+        shouldShow ? "" : "none";
 
+      if (shouldShow) {
+        visibleCards += 1;
+      }
     });
 
+    group.style.display =
+      matchesRound && visibleCards > 0
+        ? ""
+        : "none";
+  });
 }

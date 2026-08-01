@@ -14,11 +14,9 @@ const CACHE = {};
  ************************************************/
 
 function responder(obj) {
-
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
+    ContentService.MimeType.JSON,
+  );
 }
 
 /************************************************
@@ -26,7 +24,6 @@ function responder(obj) {
  ************************************************/
 
 function getSheetAsObjects(nomeAba) {
-
   if (CACHE[nomeAba]) {
     return CACHE[nomeAba];
   }
@@ -41,21 +38,14 @@ function getSheetAsObjects(nomeAba) {
   const dados = aba.getDataRange().getDisplayValues();
 
   if (dados.length <= 1) {
-
     CACHE[nomeAba] = [];
 
     return [];
-
   }
 
-  const cabecalhos = dados[0].map(c =>
-    String(c)
-      .trim()
-      .toLowerCase()
-  );
+  const cabecalhos = dados[0].map((c) => String(c).trim().toLowerCase());
 
-  const resultado = dados.slice(1).map(linha => {
-
+  const resultado = dados.slice(1).map((linha) => {
     const objeto = {};
 
     cabecalhos.forEach((cabecalho, indice) => {
@@ -63,13 +53,11 @@ function getSheetAsObjects(nomeAba) {
     });
 
     return objeto;
-
   });
 
   CACHE[nomeAba] = resultado;
 
   return resultado;
-
 }
 
 /************************************************
@@ -77,13 +65,11 @@ function getSheetAsObjects(nomeAba) {
  ************************************************/
 
 function getTemporadaAtual() {
-
   const config = getSheetAsObjects(SHEETS.configuracao);
 
-  const temporada = config.find(c => c.chave === "temporada_atual");
+  const temporada = config.find((c) => c.chave === "temporada_atual");
 
   return Number(temporada.valor);
-
 }
 
 /************************************************
@@ -91,17 +77,13 @@ function getTemporadaAtual() {
  ************************************************/
 
 function agruparRodadas(partidas) {
-
   const rodadas = [];
 
-  partidas.forEach(partida => {
-
-    let rodada = rodadas.find(r => r.rodada === partida.rodada);
+  partidas.forEach((partida) => {
+    let rodada = rodadas.find((r) => r.rodada === partida.rodada);
 
     if (!rodada) {
-
       rodada = {
-
         rodada: partida.rodada,
 
         data: partida.data,
@@ -110,38 +92,33 @@ function agruparRodadas(partidas) {
 
         status: partida.status,
 
-        partidas: []
-
+        partidas: [],
       };
 
       rodadas.push(rodada);
-
     }
 
     rodada.partidas.push(partida);
-
   });
 
   return rodadas
     .sort((a, b) => a.rodada - b.rodada)
-    .map(rodada => {
-
+    .map((rodada) => {
       const totalPartidas = rodada.partidas.length;
 
       const partidasEncerradas = rodada.partidas.filter(
-        p => p.status === "E"
+        (p) => p.status === "E",
       ).length;
 
       const partidasAoVivo = rodada.partidas.filter(
-        p => p.status === "V"
+        (p) => p.status === "V",
       ).length;
 
       const partidasAgendadas = rodada.partidas.filter(
-        p => p.status === "F"
+        (p) => p.status === "A",
       ).length;
 
       return {
-
         ...rodada,
 
         total_partidas: totalPartidas,
@@ -150,12 +127,9 @@ function agruparRodadas(partidas) {
 
         partidas_ao_vivo: partidasAoVivo,
 
-        partidas_agendadas: partidasAgendadas
-
+        partidas_agendadas: partidasAgendadas,
       };
-
     });
-
 }
 
 /************************************************
@@ -163,54 +137,41 @@ function agruparRodadas(partidas) {
  ************************************************/
 
 function getStatusInfo(status) {
-
   switch (status) {
-
     case "A":
       return {
-
         codigo: "A",
 
         descricao: "Agendado",
 
-        classe: "status-soon"
-
+        classe: "status-soon",
       };
 
     case "V":
       return {
-
         codigo: "V",
 
         descricao: "Em andamento",
 
-        classe: "status-live"
-
+        classe: "status-live",
       };
 
     case "E":
       return {
-
         codigo: "E",
 
         descricao: "Encerrado",
 
-        classe: "status-done"
-
+        classe: "status-done",
       };
 
     default:
-
       return {
-
         codigo: "",
 
         descricao: "",
 
-        classe: ""
-
+        classe: "",
       };
-
   }
-
 }

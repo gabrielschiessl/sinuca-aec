@@ -9,9 +9,27 @@ import { initFilters } from "../utils/filterController.js";
 export async function renderSerieA() {
   const app = document.getElementById("app");
   const rodadas = await getRodadas("A");
+  const jogadoresMap = new Map();
+
+  rodadas.forEach((rodada) => {
+    rodada.partidas.forEach((partida) => {
+      jogadoresMap.set(partida.jogador1.id, partida.jogador1);
+
+      jogadoresMap.set(partida.jogador2.id, partida.jogador2);
+    });
+  });
+
+  const jogadores = Array.from(jogadoresMap.values()).sort((a, b) => {
+    const nomeA = a.exibicao || a.nome || "";
+    const nomeB = b.exibicao || b.nome || "";
+
+    return nomeA.localeCompare(nomeB, "pt-BR", {
+      sensitivity: "base",
+    });
+  });
 
   app.innerHTML = `${renderNavbar({
-    title: "Série A",
+    title: "Série A",ß
   })}
 
                   ${tabs([
@@ -26,8 +44,7 @@ export async function renderSerieA() {
                         <div class="round-panel">
                             ${filters({
                               rodadas,
-
-                              jogadores: [],
+                              jogadores,
                             })}
 
 ${roundList(rodadas)}
