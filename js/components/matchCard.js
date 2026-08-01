@@ -6,7 +6,11 @@ import { formatDateTime } from "../utils/date.js";
 export function matchCard(partida) {
   return `
 
-<div class="match-card ${partida.status.codigo === "V" ? "live" : ""}">
+<div
+    class="match-card ${partida.status.codigo === "V" ? "live" : ""}"
+    data-player1="${partida.jogador1.id}"
+    data-player2="${partida.jogador2.id}"
+>
 
     <div class="match-header">
 

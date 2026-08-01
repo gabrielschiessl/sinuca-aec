@@ -4,7 +4,10 @@ import { formatDate } from "../utils/date.js";
 export function roundGroup(rodada) {
   return `
 
-<section class="round-group">
+<section
+    class="round-group"
+    data-round="${rodada.rodada}"
+>
     <div class="round-header">
 
         <div>

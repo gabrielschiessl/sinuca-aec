@@ -4,6 +4,7 @@ import { renderNavbar } from "../components/navbar.js";
 import { renderFooter } from "../components/footer.js";
 import { getRodadas } from "../api.js";
 import { filters } from "../components/filters.js";
+import { initFilters } from "../utils/filterController.js";
 
 export async function renderSerieA() {
   const app = document.getElementById("app");
@@ -61,4 +62,6 @@ ${roundList(rodadas)}
       document.getElementById(tab).style.display = "block";
     });
   });
+
+  initFilters();
 }
