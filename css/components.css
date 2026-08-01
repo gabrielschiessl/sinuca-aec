@@ -519,6 +519,10 @@
   font-size: 1.05rem;
 
   font-weight: 700;
+
+  flex-shrink: 0;
+
+  white-space: nowrap;
 }
 
 .round-title i {
