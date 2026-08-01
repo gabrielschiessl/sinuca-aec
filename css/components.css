@@ -633,7 +633,7 @@ select.score-box {
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 480px) {
   .tabs {
     bottom: 0;
 

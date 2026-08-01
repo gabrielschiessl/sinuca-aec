@@ -106,22 +106,18 @@ main {
 }
 
 .logo:hover {
-
-    transform: scale(1.04);
-
+  transform: scale(1.04);
 }
 
 .logo:active {
-
-    transform: scale(.98);
-
+  transform: scale(0.98);
 }
 
 /* ===========================
    Responsividade
 =========================== */
 
-@media (max-width: 768px) {
+@media (max-width: 480px) {
   .header {
     padding: 0 16px;
   }
