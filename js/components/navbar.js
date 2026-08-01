@@ -54,7 +54,6 @@ export function renderNavbar({ title = "" } = {}) {
               data-route="${alternateDivision.route}"
               role="menuitem"
             >
-              <span class="division-dropdown-arrow-spacer" aria-hidden="true"></span>
               <img
                 src="${BASE_PATH}/assets/images/esporte_icone_branco.png"
                 class="division-dropdown-icon"
