@@ -469,8 +469,18 @@
 }
 
 .match-card.live {
-  border-color: var(--card-live);
-  /* animation: badgePulse 1.4s ease-in-out infinite; */
+  animation: borderPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes borderPulse {
+  0%,
+  100% {
+    border-color: var(--border);
+  }
+
+  50% {
+    border-color: rgba(145, 45, 62, 0.55);
+  }
 }
 
 .live-dot {
