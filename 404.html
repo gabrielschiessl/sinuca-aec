@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AEC Sinuca</title>
+    <script>
+      const basePath = "/sinuca-aec";
+      const route = window.location.pathname.startsWith(basePath)
+        ? window.location.pathname.slice(basePath.length) || "/"
+        : "/";
+
+      window.location.replace(
+        `${basePath}/?route=${encodeURIComponent(route)}${window.location.hash}`,
+      );
+    </script>
+  </head>
+  <body></body>
+</html>

@@ -9,6 +9,8 @@ export function initFilters() {
     return;
   }
 
+  const filters = document.querySelector(".filters");
+
   roundFilter.addEventListener(
     "change",
     applyFilters
@@ -18,6 +20,32 @@ export function initFilters() {
     "change",
     applyFilters
   );
+
+  if (filters) {
+    const updateStickyState = () => {
+      if (!filters.isConnected) {
+        window.removeEventListener("scroll", updateStickyState);
+        window.removeEventListener("resize", updateStickyState);
+        return;
+      }
+
+      const headerHeight = Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue(
+          "--header-height",
+        ),
+      );
+      const stickyTop = headerHeight + 48;
+
+      filters.classList.toggle(
+        "is-stuck",
+        filters.getBoundingClientRect().top <= stickyTop,
+      );
+    };
+
+    window.addEventListener("scroll", updateStickyState, { passive: true });
+    window.addEventListener("resize", updateStickyState);
+    updateStickyState();
+  }
 }
 
 function applyFilters() {

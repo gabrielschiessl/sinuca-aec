@@ -2,6 +2,7 @@ import { renderNavbar } from "../components/navbar.js";
 import { renderFooter } from "../components/footer.js";
 import { navigate } from "../router.js";
 import { menuButton } from "../components/menuButton.js";
+import { withBasePath } from "../config.js";
 
 export function renderHome() {
   const app = document.getElementById("app");
@@ -11,7 +12,7 @@ ${renderNavbar()}
 
 <main>
   <section class="hero">
-    <img src="assets/images/esporte_page-bg.png" class="hero-logo" alt="Sinuca" />
+    <img src="${withBasePath("/assets/images/esporte_page-bg.png")}" class="hero-logo" alt="Sinuca" />
 
     <p class="hero-subtitle">Clube AEC • Temporada 2026</p>
 

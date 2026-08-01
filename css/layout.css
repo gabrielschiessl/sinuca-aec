@@ -61,6 +61,89 @@
   text-overflow: ellipsis;
 }
 
+.header-center.has-division-selector {
+  overflow: visible;
+}
+
+.division-selector {
+  position: relative;
+  pointer-events: auto;
+}
+
+.division-selector-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
+.division-selector-arrow {
+  font-size: 0.7rem;
+  transition: transform 0.2s ease;
+}
+
+.division-selector.is-open .division-selector-arrow {
+  transform: rotate(180deg);
+}
+
+.division-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  min-width: 100%;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-bg);
+  box-shadow: var(--shadow);
+}
+
+.division-selector.is-open .division-dropdown {
+  display: block;
+}
+
+.division-dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: white;
+  font-size: inherit;
+  font-weight: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.division-dropdown-item:hover,
+.division-dropdown-item:focus-visible {
+  background: var(--primary-light);
+  outline: none;
+}
+
+.division-dropdown-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.division-dropdown-arrow-spacer {
+  width: 0.7rem;
+  flex: 0 0 0.7rem;
+}
+
 .header-center-icon {
   width: 40px;
   height: 40px;
@@ -154,5 +237,31 @@ main {
   .header-center-icon {
     width: 30px;
     height: 30px;
+  }
+
+  .division-selector-toggle .header-center-icon {
+    order: 1;
+  }
+
+  .division-selector-toggle .header-title {
+    order: 2;
+  }
+
+  .division-selector-arrow {
+    order: 3;
+  }
+
+  .division-dropdown-arrow-spacer {
+    order: 3;
+  }
+
+  .division-dropdown-icon {
+    width: 30px;
+    height: 30px;
+    order: 1;
+  }
+
+  .division-dropdown-item span:not(.division-dropdown-arrow-spacer) {
+    order: 2;
   }
 }

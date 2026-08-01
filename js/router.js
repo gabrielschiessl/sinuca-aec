@@ -1,6 +1,7 @@
 import { renderHome } from "./pages/home.js";
 import { renderSerieA } from "./pages/serieA.js";
 import { renderSerieB } from "./pages/serieB.js";
+import { withBasePath, withoutBasePath } from "./config.js";
 
 const routes = {
   "/": renderHome,
@@ -9,7 +10,7 @@ const routes = {
 };
 
 export function router() {
-  const path = window.location.pathname;
+  const path = withoutBasePath();
 
   const page = routes[path] || renderHome;
 
@@ -17,7 +18,7 @@ export function router() {
 }
 
 export function navigate(path) {
-  window.history.pushState({}, "", path);
+  window.history.pushState({}, "", withBasePath(path));
 
   router();
 }

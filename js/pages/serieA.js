@@ -8,13 +8,52 @@ import { initFilters } from "../utils/filterController.js";
 
 export async function renderSerieA() {
   const app = document.getElementById("app");
-  const rodadas = await getRodadas("A");
+
+  app.innerHTML = renderPage();
+  initTabs();
+
+  await loadRodadas();
+}
+
+async function loadRodadas() {
+  const content = document.getElementById("round-panel-content");
+
+  if (!content) return;
+
+  content.innerHTML = `
+    <div class="loading-state" role="status" aria-live="polite">
+      <span class="loading-spinner" aria-hidden="true"></span>
+      <span>Carregando rodadas...</span>
+    </div>`;
+
+  try {
+    const rodadas = await getRodadas("A");
+
+    if (!content.isConnected) return;
+
+    renderRodadas(content, rodadas);
+  } catch (error) {
+    if (!content.isConnected) return;
+
+    content.innerHTML = `
+      <div class="error-state" role="alert">
+        <i class="bi bi-exclamation-circle" aria-hidden="true"></i>
+        <p>Não foi possível carregar as rodadas.</p>
+        <button type="button" class="btn btn-outline" id="retry-rounds">
+          Tentar novamente
+        </button>
+      </div>`;
+
+    document.getElementById("retry-rounds")?.addEventListener("click", loadRodadas);
+  }
+}
+
+function renderRodadas(content, rodadas) {
   const jogadoresMap = new Map();
 
   rodadas.forEach((rodada) => {
     rodada.partidas.forEach((partida) => {
       jogadoresMap.set(partida.jogador1.id, partida.jogador1);
-
       jogadoresMap.set(partida.jogador2.id, partida.jogador2);
     });
   });
@@ -23,68 +62,56 @@ export async function renderSerieA() {
     const nomeA = a.exibicao || a.nome || "";
     const nomeB = b.exibicao || b.nome || "";
 
-    return nomeA.localeCompare(nomeB, "pt-BR", {
-      sensitivity: "base",
-    });
+    return nomeA.localeCompare(nomeB, "pt-BR", { sensitivity: "base" });
   });
 
-  app.innerHTML = `${renderNavbar({
-    title: "Série A",
-  })}
+  content.innerHTML = `${filters({ rodadas, jogadores })}${roundList(rodadas)}`;
+  initFilters();
+}
 
-                  ${tabs([
-                    {
-                      id: "rodadas",
-                      label: "Rodadas",
-                      icon: "bi bi-calendar3",
-                    },
-                    {
-                      id: "classificacao",
-                      label: "Classificação",
-                      icon: "bi bi-bar-chart-steps",
-                    },
-                    {
-                      id: "resultados",
-                      label: "Resultados",
-                      icon: "bi bi-clipboard-data",
-                    },
-                  ])} 
+function renderPage() {
+  return `${renderNavbar({ title: "Série A" })}
+    ${tabs([
+      { id: "rodadas", label: "Rodadas", icon: "bi bi-calendar3" },
+      {
+        id: "classificacao",
+        label: "Classificação",
+        icon: "bi bi-bar-chart-steps",
+      },
+      { id: "resultados", label: "Resultados", icon: "bi bi-clipboard-data" },
+    ])}
 
-                  <main class="serie-page">
+    <main class="serie-page">
+      <section id="rodadas">
+        <h2 class="section-heading-title">
+          <i class="bi bi-calendar3"></i>
+          Rodadas
+        </h2>
+        <div class="round-panel">
+          <div id="round-panel-content"></div>
+        </div>
+      </section>
 
-                    <section id="rodadas">
-    <h2 class="section-heading-title">
-      <i class="bi bi-calendar3"></i>
-      Rodadas
-    </h2>
-                        <div class="round-panel">
-                            ${filters({
-                              rodadas,
-                              jogadores,
-                            })}
+      <section id="classificacao" style="display: none">
+        <h2>Classificação</h2>
+      </section>
 
-${roundList(rodadas)}
-                        </div>
-                    </section>
+      <section id="resultados" style="display: none">
+        <h2>Resultados</h2>
+      </section>
 
-                    <section id="classificacao">
-                      <h2>Classificação</h2>
-                    </section>
+      ${renderFooter("footer-light")}
+    </main>`;
+}
 
-                    <section id="resultados">
-                      <h2>Resultados</h2>
-                    </section>
-
-                    ${renderFooter("footer-light")}
-                  </main>`;
-
+function initTabs() {
   document.querySelectorAll(".tab-button").forEach((button) => {
     button.addEventListener("click", () => {
       const tab = button.dataset.tab;
 
       document
         .querySelectorAll(".tab-button")
-        .forEach((btn) => btn.classList.remove("active"));
+        .forEach((item) => item.classList.remove("active"));
 
       button.classList.add("active");
 
@@ -95,6 +122,4 @@ ${roundList(rodadas)}
       document.getElementById(tab).style.display = "block";
     });
   });
-
-  initFilters();
 }
