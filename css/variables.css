@@ -53,5 +53,5 @@
   --group-bg: #25121b; /* Background do group-container */
   --surface-black: #10070b; /* --dark */
   --tab-accent: #ab2959; /* cor do tab selecionado */
-  --card-live: media#220f16; /* cor do header e border do card de partida ao vivo */
+  --card-live: #220f16; /* cor do header e border do card de partida ao vivo */
 }
