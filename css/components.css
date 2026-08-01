@@ -468,7 +468,7 @@
   background: var(--card-live);
 }
 
-.match-card.live {
+.match-card.live, .match-card.live .match-footer {
   animation: borderPulse 1.4s ease-in-out infinite;
 }
 
