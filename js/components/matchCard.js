@@ -38,7 +38,7 @@ export function matchCard(partida) {
 
     <span class="score-x">
 
-        ×
+        X
 
     </span>
 

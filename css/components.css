@@ -233,13 +233,7 @@
 .score-box {
   width: 52px;
 
-  height: 44px;
-
-  display: flex;
-
-  align-items: center;
-
-  justify-content: center;
+  text-align: center;
 
   background: var(--panel-bg);
 
@@ -255,7 +249,7 @@
 
   font-weight: 700;
 
-  appearance: none;
+  outline: none;
 
   cursor: pointer;
 
@@ -263,7 +257,6 @@
 }
 
 .score-box:focus {
-  outline: none;
   background: var(--panel-bg);
   border-color: var(--accent);
 }
@@ -411,8 +404,6 @@
   justify-content: space-between;
 
   align-items: center;
-
-  padding: 18px 22px;
 }
 
 .round-title {
@@ -422,7 +413,9 @@
 
   border-radius: 6px;
 
-  padding: 5px 16px;
+  padding: 4px 16px;
+
+  margin: 0px 0px 14px;
 
   display: flex;
 
@@ -437,18 +430,6 @@
 
 .round-title i {
   font-size: 22px;
-}
-
-.round-date {
-  margin-top: 4px;
-
-  font-size: 0.88rem;
-
-  opacity: 0.85;
-}
-
-.round-content {
-  padding: 18px;
 }
 
 .round-matches {
@@ -564,32 +545,16 @@
   font-weight: 700;
 }
 
-.match-score {
-  display: flex;
-
-  align-items: center;
-
-  gap: 12px;
-
-  flex-shrink: 0;
-}
-
-.score-divider {
-  font-size: 1.25rem;
-
-  font-weight: 700;
-
-  color: var(--primary);
-}
-
 .match-footer {
-  padding: 8px 16px 14px;
+  padding: 8px 16px;
 
   border-top: 1px solid var(--border);
 
   font-size: 0.9rem;
 
   color: var(--text-extralight);
+
+  text-align: center;
 }
 
 .score-box {
@@ -704,20 +669,19 @@ select.score-box {
     width: 100%;
   }
 
-  .match-score {
-    order: 2;
-  }
-
   .match-body {
+    flex-direction: column;
     gap: 10px;
   }
 
+  .player-name {
+    font-size: 1rem;
+  }
+
   .score-box {
-    width: 46px;
+    width: 48px;
 
-    height: 40px;
-
-    font-size: 1.15rem;
+    font-size: 1.1rem;
   }
 
   .round-header {

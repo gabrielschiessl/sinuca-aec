@@ -17,12 +17,6 @@ export function roundGroup(rodada) {
 
             </div>
 
-            <div class="round-date">
-
-               ${formatDate(rodada.data)}
-
-            </div>
-
         </div>
 
     </div>
