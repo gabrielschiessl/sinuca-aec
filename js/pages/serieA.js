@@ -29,7 +29,7 @@ export async function renderSerieA() {
   });
 
   app.innerHTML = `${renderNavbar({
-    title: "Série A",ß
+    title: "Série A",
   })}
 
                   ${tabs([
