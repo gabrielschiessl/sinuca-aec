@@ -10,8 +10,6 @@ export function roundGroup(rodada) {
 >
     <div class="round-header">
 
-        <div>
-
             <div class="round-title">
 
                 <i class="bi bi-8-circle-fill"></i>
@@ -20,8 +18,21 @@ export function roundGroup(rodada) {
 
             </div>
 
-        </div>
+            <div class="round-status-badges">
 
+    <span class="round-status-badge soon">
+      Agendado: ${rodada.partidas_agendadas}
+    </span>
+
+    <span class="round-status-badge live">
+      <span class="live-dot"></span>Em andamento: ${rodada.partidas_ao_vivo}
+    </span>
+
+    <span class="round-status-badge done">
+      Encerrado: ${rodada.partidas_encerradas}
+    </span>
+
+  </div>
     </div>
 
     <div class="round-content">

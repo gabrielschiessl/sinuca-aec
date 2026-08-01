@@ -17,7 +17,8 @@ data-tab="${tab.id}"
 
 >
 
-${tab.label}
+<i class="${tab.icon}"></i>
+  <span>${tab.label}</span>
 
 </button>
 

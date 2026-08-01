@@ -33,14 +33,30 @@ export async function renderSerieA() {
   })}
 
                   ${tabs([
-                    { id: "rodadas", label: "Rodadas" },
-                    { id: "classificacao", label: "Classificação" },
-                    { id: "resultados", label: "Resultados" },
+                    {
+                      id: "rodadas",
+                      label: "Rodadas",
+                      icon: "bi bi-calendar3",
+                    },
+                    {
+                      id: "classificacao",
+                      label: "Classificação",
+                      icon: "bi bi-bar-chart-steps",
+                    },
+                    {
+                      id: "resultados",
+                      label: "Resultados",
+                      icon: "bi bi-clipboard-data",
+                    },
                   ])} 
 
                   <main class="serie-page">
 
                     <section id="rodadas">
+    <h2 class="section-heading-title">
+      <i class="bi bi-calendar3"></i>
+      Rodadas
+    </h2>
                         <div class="round-panel">
                             ${filters({
                               rodadas,

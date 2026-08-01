@@ -161,6 +161,10 @@
 }
 
 .tab-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   flex: 1;
 
   max-width: 180px;
@@ -182,6 +186,10 @@
   position: relative;
 
   transition: 0.25s;
+}
+
+.tab-button i {
+  font-size: 1rem;
 }
 
 .tab-button:hover {
@@ -212,6 +220,32 @@
   background: var(--tab-accent);
 
   border-radius: 10px;
+}
+
+.section-heading-title {
+  max-width: 980px;
+  margin: auto;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 1.4rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-heading-title i {
+  color: white;
+  font-size: 1.25rem;
+}
+
+.section-heading-title::after {
+  content: "";
+  flex: 1;
+  height: 2px;
+  background: var(--border);
 }
 
 .player {
@@ -404,6 +438,38 @@
   justify-content: space-between;
 
   align-items: center;
+
+  flex-wrap: wrap;
+}
+
+.round-status-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 12px;
+  font-size: 0.73rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.round-status-badge.soon {
+  background: #e0f2fe;
+
+  color: #0369a1;
+}
+
+.round-status-badge.live {
+  background: #fee2e2;
+
+  color: #dc2626;
+
+  animation: badgePulse 1.4s ease-in-out infinite;
+}
+
+.round-status-badge.done {
+  background: #93f7a9;
+
+  color: #0a7235;
 }
 
 .round-title {
@@ -468,7 +534,8 @@
   background: var(--card-live);
 }
 
-.match-card.live, .match-card.live .match-footer {
+.match-card.live,
+.match-card.live .match-footer {
   animation: borderPulse 1.4s ease-in-out infinite;
 }
 
@@ -627,9 +694,9 @@ select.score-box {
 }
 
 .status-done {
-  background: #fee2e2;
+  background: #93f7a9;
 
-  color: #dc2626;
+  color: #0a7235;
 }
 
 @keyframes badgePulse {
@@ -640,6 +707,31 @@ select.score-box {
 
   50% {
     opacity: 0.55;
+  }
+}
+
+@media (max-width: 680px) {
+  .round-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: nowrap;
+    margin: 0 0 14px;
+  }
+
+  .round-status-badges {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    flex-wrap: nowrap;
+    margin-left: auto;
+  }
+
+  .round-status-badge {
+    justify-content: center;
+    width: max-content;
   }
 }
 
@@ -692,14 +784,6 @@ select.score-box {
     width: 48px;
 
     font-size: 1.1rem;
-  }
-
-  .round-header {
-    flex-direction: column;
-
-    align-items: flex-start;
-
-    gap: 12px;
   }
 
   .status-badge {
