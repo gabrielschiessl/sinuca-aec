@@ -143,7 +143,7 @@ function renderSequence(titulo, total, passos) {
         ${passos
           .map(
             ([arquivo, tipo], index) => `
-              ${index ? '<i class="bi bi-arrow-right sequence-arrow" aria-hidden="true"></i>' : ""}
+              ${index ? '<span class="sequence-arrow" aria-hidden="true">→</span>' : ""}
               <div class="sequence-step" title="${sequenceTypeName(tipo)}">
                 <img
                   src="${withBasePath(`/assets/images/regulamento/${arquivo}`)}"
