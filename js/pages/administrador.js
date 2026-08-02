@@ -7,8 +7,10 @@ import {
 } from "../auth.js";
 import { GOOGLE_CLIENT_ID } from "../config.js";
 import {
+  getAdminJogadores,
   getAdminPartidas,
   getAdminParticipantes,
+  saveAdminJogadores,
   saveAdminPartidas,
   saveAdminParticipantes,
 } from "../api.js";
@@ -184,6 +186,7 @@ function renderDashboard(session) {
       <nav class="admin-management-tabs" aria-label="Ferramentas administrativas">
         <button class="active" type="button" data-admin-tool="partidas"><i class="bi bi-calendar3"></i> Partidas</button>
         <button type="button" data-admin-tool="participantes"><i class="bi bi-people-fill"></i> Participantes</button>
+        <button type="button" data-admin-tool="jogadores"><i class="bi bi-person-badge-fill"></i> Jogadores</button>
       </nav>
 
       <section class="admin-matches-module" data-admin-tool-section="partidas">
@@ -225,6 +228,19 @@ function renderDashboard(session) {
         <div data-admin-participants></div>
       </section>
 
+      <section class="admin-players-module" data-admin-tool-section="jogadores" hidden>
+        <div class="admin-module-heading">
+          <div><h2>Jogadores</h2><p>Cadastre jogadores e defina os nomes usados pelo sistema.</p></div>
+          <button class="btn" type="button" data-add-player disabled><i class="bi bi-person-plus-fill"></i> Novo jogador</button>
+        </div>
+        <p class="admin-module-note"><i class="bi bi-info-circle"></i> Jogadores não são excluídos: podem ser inativados para preservar temporadas anteriores. Participantes da temporada atual devem ser substituídos antes.</p>
+        <div class="admin-bulk-actions">
+          <span data-player-pending>Nenhuma alteração pendente</span>
+          <button class="btn" type="button" data-save-players disabled>Salvar jogadores</button>
+        </div>
+        <div class="admin-player-list" data-admin-players></div>
+      </section>
+
     </section>
   `;
 
@@ -237,6 +253,8 @@ function renderDashboard(session) {
   page.querySelectorAll("[data-admin-tool]").forEach((button) => button.addEventListener("click", () => selectAdminTool(button.dataset.adminTool)));
   page.querySelector("[data-participant-division]")?.addEventListener("change", handleParticipantDivisionChange);
   page.querySelector("[data-save-participants]")?.addEventListener("click", saveParticipantChanges);
+  page.querySelector("[data-add-player]")?.addEventListener("click", addNewPlayerRow);
+  page.querySelector("[data-save-players]")?.addEventListener("click", savePlayerChanges);
   loadAdminMatches("A", false);
 }
 
@@ -246,6 +264,9 @@ function selectAdminTool(tool) {
   page.querySelectorAll("[data-admin-tool-section]").forEach((section) => { section.hidden = section.dataset.adminToolSection !== tool; });
   if (tool === "participantes" && !page.querySelector("[data-admin-participants]").dataset.loaded) {
     loadAdminParticipants(page.querySelector("[data-participant-division]").value);
+  }
+  if (tool === "jogadores" && !page.querySelector("[data-admin-players]").dataset.loaded) {
+    loadAdminPlayers();
   }
 }
 
@@ -257,7 +278,7 @@ function toggleAdminEditMode(event) {
   adminEditMode = !adminEditMode;
   dashboard.classList.toggle("is-editing", adminEditMode);
   banner.innerHTML = adminEditMode
-    ? `<i class="bi bi-pencil-square" aria-hidden="true"></i><div><strong>Modo de edição ativo</strong><span>Status e placares podem ser alterados e salvos.</span></div>`
+    ? `<i class="bi bi-pencil-square" aria-hidden="true"></i><div><strong>Modo de edição ativo</strong><span>Os dados do campeonato podem ser alterados e salvos.</span></div>`
     : `<i class="bi bi-eye" aria-hidden="true"></i><div><strong>Modo visualização</strong><span>Nenhuma alteração pode ser feita enquanto este modo estiver ativo.</span></div>`;
 
   event.currentTarget.innerHTML = adminEditMode
@@ -287,6 +308,19 @@ function toggleAdminEditMode(event) {
     select.disabled = !adminEditMode;
     updateParticipantDirtyState(select.closest("[data-participant-row]"));
   });
+  dashboard.querySelector("[data-add-player]").disabled = !adminEditMode;
+  dashboard.querySelectorAll("[data-player-row]").forEach((row) => {
+    if (!adminEditMode && row.dataset.new === "true") {
+      row.remove();
+      return;
+    }
+    row.querySelectorAll("input, select").forEach((field) => {
+      if (!adminEditMode) field.value = field.dataset.originalValue;
+      field.disabled = !adminEditMode;
+    });
+    updatePlayerDirtyState(row);
+  });
+  updatePlayerPendingCount();
 }
 
 async function loadAdminParticipants(divisao) {
@@ -374,10 +408,145 @@ async function saveParticipantChanges() {
   try {
     const divisao = page.querySelector("[data-participant-division]").value;
     await saveAdminParticipantes(activeAdminSession.token, divisao, changes);
-    await loadAdminParticipants(divisao);
+    const matchDivision = page.querySelector("[data-admin-division]").value;
+    const refreshes = [
+      loadAdminParticipants(divisao),
+      loadAdminPlayers(),
+    ];
+    if (matchDivision === divisao) {
+      refreshes.push(loadAdminMatches(matchDivision, true));
+    }
+    await Promise.all(refreshes);
     showAdminModal("Participantes salvos", "Os vínculos da temporada foram atualizados com sucesso.", "success");
   } catch (error) {
     updateParticipantPendingCount();
+    showAdminModal("Não foi possível salvar", error.message, "error");
+  }
+}
+
+async function loadAdminPlayers() {
+  const content = getPage()?.querySelector("[data-admin-players]");
+  if (!content || !activeAdminSession?.token) return;
+  content.dataset.loaded = "";
+  content.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Carregando jogadores...</p></div>';
+
+  try {
+    const data = await getAdminJogadores(activeAdminSession.token);
+    if (!content.isConnected) return;
+    content.innerHTML = data.jogadores.map((jogador) => renderPlayerRow(jogador)).join("");
+    content.dataset.loaded = "true";
+    bindPlayerEvents(content);
+    updatePlayerPendingCount();
+  } catch (error) {
+    if (!content.isConnected) return;
+    const message = /ação inválida/i.test(error.message)
+      ? "A versão publicada do Apps Script ainda não possui a gestão de jogadores. Publique uma nova versão da implantação e tente novamente."
+      : error.message;
+    content.innerHTML = `<div class="error-state"><i class="bi bi-exclamation-circle"></i><p>${escapeHtml(message)}</p></div>`;
+  }
+}
+
+function renderPlayerRow(jogador, novo = false) {
+  const id = Number(jogador.id) || "";
+  const nome = String(jogador.nome || "");
+  const exibicao = String(jogador.exibicao || "");
+  const apelido = String(jogador.apelido || "");
+  const ativo = jogador.ativo !== false;
+  const vinculo = jogador.participante_atual;
+  const disabled = adminEditMode ? "" : "disabled";
+
+  return `<article class="admin-player-row${novo ? " is-dirty is-new" : ""}" data-player-row data-player-id="${id}" data-new="${novo}">
+    <div class="admin-player-identity">
+      <span class="admin-player-id">${id ? `#${id}` : "Novo"}</span>
+      ${vinculo ? `<span class="admin-player-link">Série ${escapeHtml(vinculo.divisao)} · Nº ${vinculo.numero}</span>` : '<span class="admin-player-link">Sem vínculo atual</span>'}
+    </div>
+    <label><span>Nome completo</span><input class="admin-input" type="text" maxlength="80" value="${escapeHtml(nome)}" data-player-field="nome" data-original-value="${escapeHtml(nome)}" ${disabled}></label>
+    <label><span>Nome de exibição</span><input class="admin-input" type="text" maxlength="80" value="${escapeHtml(exibicao)}" data-player-field="exibicao" data-original-value="${escapeHtml(exibicao)}" ${disabled}></label>
+    <label><span>Apelido</span><input class="admin-input" type="text" maxlength="80" value="${escapeHtml(apelido)}" data-player-field="apelido" data-original-value="${escapeHtml(apelido)}" ${disabled}></label>
+    <label><span>Situação</span><select class="admin-select" data-player-field="ativo" data-original-value="${ativo ? "S" : "N"}" ${disabled}><option value="S" ${ativo ? "selected" : ""}>Ativo</option><option value="N" ${ativo ? "" : "selected"}>Inativo</option></select></label>
+  </article>`;
+}
+
+function bindPlayerEvents(container = getPage()) {
+  const rows = container?.matches?.("[data-player-row]")
+    ? [container]
+    : [...(container?.querySelectorAll("[data-player-row]") || [])];
+  rows.forEach((row) => {
+    row.querySelectorAll("input, select").forEach((field) => {
+      field.addEventListener("input", () => updatePlayerDirtyState(row));
+      field.addEventListener("change", () => updatePlayerDirtyState(row));
+    });
+  });
+}
+
+function addNewPlayerRow() {
+  if (!adminEditMode) return;
+  const content = getPage()?.querySelector("[data-admin-players]");
+  if (!content) return;
+  content.insertAdjacentHTML("afterbegin", renderPlayerRow({ ativo: true }, true));
+  const row = content.firstElementChild;
+  bindPlayerEvents(row);
+  row.querySelector("input")?.focus();
+  updatePlayerPendingCount();
+}
+
+function updatePlayerDirtyState(row) {
+  if (!row) return;
+  const dirty = row.dataset.new === "true" || [...row.querySelectorAll("input, select")]
+    .some((field) => field.value.trim() !== String(field.dataset.originalValue || "").trim());
+  row.classList.toggle("is-dirty", dirty);
+  updatePlayerPendingCount();
+}
+
+function updatePlayerPendingCount() {
+  const page = getPage();
+  const total = page?.querySelectorAll("[data-player-row].is-dirty").length || 0;
+  const label = page?.querySelector("[data-player-pending]");
+  const button = page?.querySelector("[data-save-players]");
+  if (label) label.textContent = total ? `${total} ${total === 1 ? "alteração pendente" : "alterações pendentes"}` : "Nenhuma alteração pendente";
+  if (button) button.disabled = !adminEditMode || total === 0;
+}
+
+async function savePlayerChanges() {
+  const page = getPage();
+  const rows = [...page.querySelectorAll("[data-player-row].is-dirty")];
+  if (!rows.length) return;
+
+  const jogadores = rows.map((row) => ({
+    id: Number(row.dataset.playerId) || null,
+    nome: row.querySelector('[data-player-field="nome"]').value.trim(),
+    exibicao: row.querySelector('[data-player-field="exibicao"]').value.trim(),
+    apelido: row.querySelector('[data-player-field="apelido"]').value.trim(),
+    ativo: row.querySelector('[data-player-field="ativo"]').value === "S",
+  }));
+  if (jogadores.some((jogador) => !jogador.nome)) {
+    return showAdminModal("Nome obrigatório", "Informe ao menos o nome completo de todos os jogadores alterados.", "error");
+  }
+
+  jogadores.forEach((jogador) => {
+    if (!jogador.exibicao) jogador.exibicao = jogador.nome;
+    if (!jogador.apelido) jogador.apelido = jogador.exibicao;
+  });
+  const resumo = jogadores
+    .map((jogador) => `${jogador.id ? `#${jogador.id}` : "Novo"}: ${jogador.exibicao} (${jogador.ativo ? "ativo" : "inativo"})`)
+    .join("; ");
+  const confirmed = await confirmAdminChange("Salvar jogadores?", `Confira as alterações: ${resumo}`);
+  if (!confirmed) return;
+
+  const button = page.querySelector("[data-save-players]");
+  button.disabled = true;
+  try {
+    await saveAdminJogadores(activeAdminSession.token, jogadores);
+    const participantDivision = page.querySelector("[data-participant-division]").value;
+    const matchDivision = page.querySelector("[data-admin-division]").value;
+    await Promise.all([
+      loadAdminPlayers(),
+      loadAdminParticipants(participantDivision),
+      loadAdminMatches(matchDivision, true),
+    ]);
+    showAdminModal("Jogadores salvos", "Os cadastros foram atualizados com sucesso.", "success");
+  } catch (error) {
+    updatePlayerPendingCount();
     showAdminModal("Não foi possível salvar", error.message, "error");
   }
 }

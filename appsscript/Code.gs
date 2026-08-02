@@ -50,9 +50,17 @@ function doPost(e) {
         validarSessaoAdmin(dados.token);
         return responder(getParticipantesAdmin(dados.divisao || "A"));
 
+      case "admin_jogadores":
+        validarSessaoAdmin(dados.token);
+        return responder(getJogadoresAdmin());
+
       case "salvar_participantes":
         validarSessaoAdmin(dados.token);
         return responder(salvarParticipantesAdmin(dados));
+
+      case "salvar_jogadores":
+        validarSessaoAdmin(dados.token);
+        return responder(salvarJogadoresAdmin(dados));
 
       case "salvar_partida":
         validarSessaoAdmin(dados.token);

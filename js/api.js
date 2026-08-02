@@ -122,8 +122,19 @@ export function getAdminParticipantes(token, divisao) {
   return post({ acao: "admin_participantes", token, divisao });
 }
 
+export function getAdminJogadores(token) {
+  return post({ acao: "admin_jogadores", token });
+}
+
 export function saveAdminParticipantes(token, divisao, participantes) {
   return post({ acao: "salvar_participantes", token, divisao, participantes }).then((result) => {
+    cache.clear();
+    return result;
+  });
+}
+
+export function saveAdminJogadores(token, jogadores) {
+  return post({ acao: "salvar_jogadores", token, jogadores }).then((result) => {
     cache.clear();
     return result;
   });
