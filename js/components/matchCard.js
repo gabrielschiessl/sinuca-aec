@@ -1,7 +1,7 @@
 import { statusBadge } from "./statusBadge.js";
 import { scoreBox } from "./scoreBox.js";
 import { matchFooter } from "./matchFooter.js";
-import { formatDateTime } from "../utils/date.js";
+import { formatDate, formatTime } from "../utils/date.js";
 
 export function matchCard(partida) {
   return `
@@ -14,11 +14,11 @@ export function matchCard(partida) {
 
     <div class="match-header">
 
-        <span>
-
-    ${formatDateTime(partida.data, partida.hora)}
-
-</span>
+        <span class="match-date-time">
+          <span class="match-date">${formatDate(partida.data)}</span>
+          <span class="match-date-separator" aria-hidden="true">•</span>
+          <span class="match-time">${formatTime(partida.hora)}</span>
+        </span>
 
         ${statusBadge(partida.status)}
 

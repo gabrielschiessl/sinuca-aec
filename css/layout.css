@@ -332,3 +332,41 @@ main {
     height: 27px;
   }
 }
+
+@media (max-width: 360px) {
+  :root {
+    --header-height: 70px;
+  }
+
+  .header {
+    padding-inline: 12px;
+  }
+
+  .header-left .logo {
+    height: 27px;
+  }
+
+  .header-center {
+    font-size: 1.25rem;
+  }
+
+  .division-selector-toggle {
+    gap: 3px;
+    padding-inline: 3px;
+  }
+
+  .division-selector-toggle .header-center-icon,
+  .division-dropdown-icon {
+    width: 23px;
+    height: 23px;
+  }
+
+  .division-selector-toggle .header-center-icon {
+    margin-right: 1px;
+  }
+
+  .division-selector-arrow {
+    margin-left: 1px;
+    font-size: 0.6rem;
+  }
+}

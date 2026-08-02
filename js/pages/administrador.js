@@ -6,7 +6,12 @@ import {
   restoreAdminSession,
 } from "../auth.js";
 import { GOOGLE_CLIENT_ID } from "../config.js";
-import { getAdminPartidas, saveAdminPartidas } from "../api.js";
+import {
+  getAdminPartidas,
+  getAdminParticipantes,
+  saveAdminPartidas,
+  saveAdminParticipantes,
+} from "../api.js";
 
 const PAGE_ID = "admin-page";
 let activeAdminSession = null;
@@ -176,7 +181,12 @@ function renderDashboard(session) {
       <h1>Gestão do campeonato</h1>
       <p class="admin-intro">Este é o ponto de entrada para jogadores, temporadas, chaveamento e resultados.</p>
 
-      <section class="admin-matches-module">
+      <nav class="admin-management-tabs" aria-label="Ferramentas administrativas">
+        <button class="active" type="button" data-admin-tool="partidas"><i class="bi bi-calendar3"></i> Partidas</button>
+        <button type="button" data-admin-tool="participantes"><i class="bi bi-people-fill"></i> Participantes</button>
+      </nav>
+
+      <section class="admin-matches-module" data-admin-tool-section="partidas">
         <div class="admin-module-heading">
           <div><h2>Partidas</h2><p>Consulte status e placares da temporada atual.</p></div>
           <label><span>Divisão</span><select class="admin-select" data-admin-division><option value="A">Série A</option><option value="B">Série B</option></select></label>
@@ -189,7 +199,7 @@ function renderDashboard(session) {
             </select>
           </label>
           <label class="admin-match-filter">
-            <span><i class="bi bi-person-fill" aria-hidden="true"></i> Visualizar partidas de</span>
+            <span><i class="bi bi-person-fill" aria-hidden="true"></i> Filtro de Jogador</span>
             <select class="admin-select" data-admin-player-filter>
               <option value="">Todos os jogadores</option>
             </select>
@@ -202,6 +212,19 @@ function renderDashboard(session) {
         <div data-admin-matches></div>
       </section>
 
+      <section class="admin-participants-module" data-admin-tool-section="participantes" hidden>
+        <div class="admin-module-heading">
+          <div><h2>Participantes</h2><p>Defina qual jogador ocupa cada número competitivo da temporada atual.</p></div>
+          <label><span>Divisão</span><select class="admin-select" data-participant-division><option value="A">Série A</option><option value="B">Série B</option></select></label>
+        </div>
+        <p class="admin-module-note"><i class="bi bi-info-circle"></i> Os números são os slots usados pelo chaveamento. Nesta etapa, somente o jogador vinculado ao número será alterado.</p>
+        <div class="admin-bulk-actions">
+          <span data-participant-pending>Nenhuma alteração pendente</span>
+          <button class="btn" type="button" data-save-participants disabled>Salvar participantes</button>
+        </div>
+        <div data-admin-participants></div>
+      </section>
+
     </section>
   `;
 
@@ -211,7 +234,19 @@ function renderDashboard(session) {
   page.querySelector("[data-admin-round-filter]")?.addEventListener("change", applyAdminMatchFilters);
   page.querySelector("[data-admin-player-filter]")?.addEventListener("change", applyAdminMatchFilters);
   page.querySelector("[data-save-all]")?.addEventListener("click", () => requestSaveCards(null, page.querySelector("[data-admin-division]").value));
+  page.querySelectorAll("[data-admin-tool]").forEach((button) => button.addEventListener("click", () => selectAdminTool(button.dataset.adminTool)));
+  page.querySelector("[data-participant-division]")?.addEventListener("change", handleParticipantDivisionChange);
+  page.querySelector("[data-save-participants]")?.addEventListener("click", saveParticipantChanges);
   loadAdminMatches("A", false);
+}
+
+function selectAdminTool(tool) {
+  const page = getPage();
+  page.querySelectorAll("[data-admin-tool]").forEach((button) => button.classList.toggle("active", button.dataset.adminTool === tool));
+  page.querySelectorAll("[data-admin-tool-section]").forEach((section) => { section.hidden = section.dataset.adminToolSection !== tool; });
+  if (tool === "participantes" && !page.querySelector("[data-admin-participants]").dataset.loaded) {
+    loadAdminParticipants(page.querySelector("[data-participant-division]").value);
+  }
 }
 
 function toggleAdminEditMode(event) {
@@ -247,6 +282,104 @@ function toggleAdminEditMode(event) {
     if (saveButton) saveButton.disabled = !adminEditMode;
     if (!adminEditMode) updateCardDirtyState(card);
   });
+  dashboard.querySelectorAll("[data-participant-select]").forEach((select) => {
+    if (!adminEditMode) select.value = select.dataset.originalPlayer;
+    select.disabled = !adminEditMode;
+    updateParticipantDirtyState(select.closest("[data-participant-row]"));
+  });
+}
+
+async function loadAdminParticipants(divisao) {
+  const content = getPage()?.querySelector("[data-admin-participants]");
+  if (!content || !activeAdminSession?.token) return;
+  content.dataset.loaded = "";
+  content.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Carregando participantes...</p></div>';
+  try {
+    const data = await getAdminParticipantes(activeAdminSession.token, divisao);
+    if (!content.isConnected) return;
+    content.innerHTML = data.participantes.map((participante) => renderParticipantRow(participante, data.jogadores)).join("");
+    content.dataset.loaded = "true";
+    bindParticipantEvents();
+    updateParticipantPendingCount();
+  } catch (error) {
+    if (content.isConnected) {
+      const message = /ação inválida/i.test(error.message)
+        ? "A versão publicada do Apps Script ainda não possui a gestão de participantes. Publique uma nova versão da implantação e tente novamente."
+        : error.message;
+      content.innerHTML = `<div class="error-state"><i class="bi bi-exclamation-circle"></i><p>${escapeHtml(message)}</p></div>`;
+    }
+  }
+}
+
+async function handleParticipantDivisionChange(event) {
+  const select = event.currentTarget;
+  const previous = select.dataset.previousValue || "A";
+  const pending = getPage()?.querySelectorAll("[data-participant-row].is-dirty").length || 0;
+  if (pending) {
+    const confirmed = await confirmAdminChange("Descartar alterações?", "Ao trocar de divisão, as alterações de participantes ainda não salvas serão descartadas.");
+    if (!confirmed) { select.value = previous; return; }
+  }
+  select.dataset.previousValue = select.value;
+  loadAdminParticipants(select.value);
+}
+
+function renderParticipantRow(participante, jogadores) {
+  const options = jogadores
+    .slice()
+    .sort((a, b) => a.exibicao.localeCompare(b.exibicao, "pt-BR"))
+    .map((jogador) => `<option value="${jogador.id}" ${jogador.id === participante.jogador_id ? "selected" : ""}>${escapeHtml(jogador.exibicao)}${jogador.ativo ? "" : " (inativo)"}</option>`)
+    .join("");
+  return `<article class="admin-participant-row" data-participant-row data-number="${participante.numero}">
+    <span class="admin-participant-number">${participante.numero}</span>
+    <label><span>Jogador</span><select class="admin-select" data-participant-select data-original-player="${participante.jogador_id}" ${adminEditMode ? "" : "disabled"}>${options}</select></label>
+  </article>`;
+}
+
+function bindParticipantEvents() {
+  getPage()?.querySelectorAll("[data-participant-select]").forEach((select) => {
+    select.addEventListener("change", () => updateParticipantDirtyState(select.closest("[data-participant-row]")));
+  });
+}
+
+function updateParticipantDirtyState(row) {
+  if (!row) return;
+  const select = row.querySelector("[data-participant-select]");
+  row.classList.toggle("is-dirty", select.value !== select.dataset.originalPlayer);
+  updateParticipantPendingCount();
+}
+
+function updateParticipantPendingCount() {
+  const page = getPage();
+  const total = page?.querySelectorAll("[data-participant-row].is-dirty").length || 0;
+  const label = page?.querySelector("[data-participant-pending]");
+  const button = page?.querySelector("[data-save-participants]");
+  if (label) label.textContent = total ? `${total} ${total === 1 ? "alteração pendente" : "alterações pendentes"}` : "Nenhuma alteração pendente";
+  if (button) button.disabled = !adminEditMode || total === 0;
+}
+
+async function saveParticipantChanges() {
+  const page = getPage();
+  const rows = [...page.querySelectorAll("[data-participant-row].is-dirty")];
+  if (!rows.length) return;
+  const selectedPlayers = [...page.querySelectorAll("[data-participant-select]")].map((select) => select.value);
+  if (selectedPlayers.some((id, index) => selectedPlayers.indexOf(id) !== index)) {
+    return showAdminModal("Jogador duplicado", "Cada jogador pode ocupar somente um número na divisão.", "error");
+  }
+  const changes = rows.map((row) => ({ numero: Number(row.dataset.number), jogador_id: Number(row.querySelector("[data-participant-select]").value) }));
+  const summary = rows.map((row) => `Nº ${row.dataset.number}: ${row.querySelector("option:checked").textContent}`).join("; ");
+  const confirmed = await confirmAdminChange("Salvar participantes?", `Confira as alterações: ${summary}`);
+  if (!confirmed) return;
+  const button = page.querySelector("[data-save-participants]");
+  button.disabled = true;
+  try {
+    const divisao = page.querySelector("[data-participant-division]").value;
+    await saveAdminParticipantes(activeAdminSession.token, divisao, changes);
+    await loadAdminParticipants(divisao);
+    showAdminModal("Participantes salvos", "Os vínculos da temporada foram atualizados com sucesso.", "success");
+  } catch (error) {
+    updateParticipantPendingCount();
+    showAdminModal("Não foi possível salvar", error.message, "error");
+  }
 }
 
 async function loadAdminMatches(divisao, preserveFilters = true) {

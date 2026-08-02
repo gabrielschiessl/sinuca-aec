@@ -21,15 +21,15 @@ export function roundGroup(rodada) {
             <div class="round-status-badges">
 
     <span class="round-status-badge soon">
-      Agendado: ${rodada.partidas_agendadas}
+      <span class="round-status-label full">Agendado</span><span class="round-status-label compact">Ag.</span>: ${rodada.partidas_agendadas}
     </span>
 
     <span class="round-status-badge live">
-      <span class="live-dot"></span>Em andamento: ${rodada.partidas_ao_vivo}
+      <span class="live-dot"></span><span class="round-status-label full">Em andamento</span><span class="round-status-label compact">Ao vivo</span>: ${rodada.partidas_ao_vivo}
     </span>
 
     <span class="round-status-badge done">
-      Encerrado: ${rodada.partidas_encerradas}
+      <span class="round-status-label full">Encerrado</span><span class="round-status-label compact">Enc.</span>: ${rodada.partidas_encerradas}
     </span>
 
   </div>

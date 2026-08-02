@@ -5,7 +5,11 @@ export function statusBadge(status) {
 
     ${status.codigo === "V" ? '<span class="live-dot"></span>' : ""}
 
-      ${status.descricao}
+      ${
+        status.codigo === "V"
+          ? '<span class="status-label full">Em andamento</span><span class="status-label compact">Ao vivo</span>'
+          : status.descricao
+      }
 
     </span>
 

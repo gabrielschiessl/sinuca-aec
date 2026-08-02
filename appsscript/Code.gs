@@ -46,6 +46,14 @@ function doPost(e) {
         validarSessaoAdmin(dados.token);
         return responder(getPartidasAdmin(dados.divisao || "A"));
 
+      case "admin_participantes":
+        validarSessaoAdmin(dados.token);
+        return responder(getParticipantesAdmin(dados.divisao || "A"));
+
+      case "salvar_participantes":
+        validarSessaoAdmin(dados.token);
+        return responder(salvarParticipantesAdmin(dados));
+
       case "salvar_partida":
         validarSessaoAdmin(dados.token);
         return responder(salvarPartidasAdmin({ partidas: [dados] }).partidas[0]);

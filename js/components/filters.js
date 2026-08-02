@@ -48,7 +48,7 @@ export function filters({ rodadas = [], jogadores = [] }) {
 
             <i class="bi bi-person-fill"></i>
 
-            Visualizar rodadas de
+            Filtro de Jogador
 
         </label>
 

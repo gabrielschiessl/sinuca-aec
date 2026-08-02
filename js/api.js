@@ -118,6 +118,17 @@ export function getAdminPartidas(token, divisao) {
   return post({ acao: "admin_partidas", token, divisao });
 }
 
+export function getAdminParticipantes(token, divisao) {
+  return post({ acao: "admin_participantes", token, divisao });
+}
+
+export function saveAdminParticipantes(token, divisao, participantes) {
+  return post({ acao: "salvar_participantes", token, divisao, participantes }).then((result) => {
+    cache.clear();
+    return result;
+  });
+}
+
 export function saveAdminPartida(token, partida) {
   return post({ acao: "salvar_partida", token, ...partida }).then((result) => {
     cache.clear();
