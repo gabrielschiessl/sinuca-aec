@@ -283,9 +283,15 @@ main {
   }
 
   .division-selector-arrow {
+    position: static;
     order: 3;
-    right: 6px;
-    left: auto;
+    margin-left: 4px;
+    flex: 0 0 auto;
+  }
+
+  .division-selector-toggle {
+    gap: 7px;
+    padding: 8px 6px;
   }
 
   .division-dropdown-icon {
@@ -296,5 +302,21 @@ main {
 
   .division-dropdown-item span {
     order: 2;
+  }
+}
+
+@media (max-width: 414px) {
+  .header-left .logo {
+    height: 31px;
+  }
+
+  .header-center {
+    font-size: 1.5rem;
+  }
+
+  .division-selector-toggle .header-center-icon,
+  .division-dropdown-icon {
+    width: 27px;
+    height: 27px;
   }
 }
