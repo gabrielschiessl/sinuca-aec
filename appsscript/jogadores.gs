@@ -87,13 +87,22 @@ function salvarJogadoresAdmin(dados) {
     const registrosPorId = {};
     registros.forEach((registro) => { registrosPorId[registro.id] = registro; });
 
+    const todosParticipantes = getSheetAsObjects(SHEETS.participantes);
+    const idsReferenciados = todosParticipantes
+      .map((participante) => Number(participante.jogador_id))
+      .filter(Boolean);
     const participantesAtuais = new Set(
-      getSheetAsObjects(SHEETS.participantes)
+      todosParticipantes
         .filter((participante) => Number(participante.temporada) === getTemporadaAtual())
         .map((participante) => Number(participante.jogador_id)),
     );
+    const ativacoesTemporarias = [];
 
-    let proximoId = Math.max(0, ...registros.map((registro) => registro.id)) + 1;
+    let proximoId = Math.max(
+      0,
+      ...registros.map((registro) => registro.id),
+      ...idsReferenciados,
+    ) + 1;
     const normalizadas = alteracoes.map((alteracao) => {
       const idInformado = Number(alteracao.id);
       const novo = !idInformado;
@@ -116,7 +125,10 @@ function salvarJogadoresAdmin(dados) {
         throw new Error(`O jogador ${exibicao} participa da temporada atual e não pode ser inativado.`);
       }
 
-      return { id, nome, exibicao, apelido, ativo, novo };
+      const ativoPersistido = ativo && participantesAtuais.has(id);
+      if (ativo && !ativoPersistido) ativacoesTemporarias.push(id);
+
+      return { id, nome, exibicao, apelido, ativo: ativoPersistido, novo };
     });
 
     const ids = normalizadas.map((jogador) => jogador.id);
@@ -140,7 +152,11 @@ function salvarJogadoresAdmin(dados) {
     });
 
     delete CACHE[SHEETS.jogadores];
-    return { sucesso: true, ...getJogadoresAdmin() };
+    return {
+      sucesso: true,
+      ativacoes_temporarias: ativacoesTemporarias,
+      ...getJogadoresAdmin(),
+    };
   } finally {
     lock.releaseLock();
   }

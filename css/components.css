@@ -977,6 +977,12 @@
 .admin-participant-row label > span { color:var(--text-muted); font-size:.72rem; font-weight:700; }
 .admin-participant-row .admin-select { width:100%; }
 .admin-player-list { display:flex; flex-direction:column; gap:8px; }
+.admin-player-search { width:100%; margin:-6px 0 18px; display:flex; flex-direction:column; gap:6px; }
+.admin-player-search > span { color:var(--text-muted); font-size:.78rem; font-weight:700; }
+.admin-filter-empty { padding:28px 16px; border:1px dashed var(--border); border-radius:10px; color:var(--text-muted); text-align:center; }
+.admin-filter-empty[hidden] { display:none !important; }
+.admin-filter-empty i { display:block; margin-bottom:6px; font-size:1.6rem; }
+.admin-player-row[hidden] { display:none !important; }
 .admin-player-row { padding:12px; display:grid; grid-template-columns:100px repeat(3,minmax(120px,1fr)) 105px; align-items:end; gap:10px; border:1px solid var(--border); border-radius:10px; background:var(--group-bg); }
 .admin-player-row.is-dirty { background:rgba(234,179,8,.10); box-shadow:inset 3px 0 #eab308; }
 .admin-player-row.is-new { border-style:dashed; }

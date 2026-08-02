@@ -58,13 +58,22 @@ function salvarParticipantesAdmin(dados) {
   const temporada = getTemporadaAtual();
   const divisao = String(dados.divisao || "").trim().toUpperCase();
   const alteracoes = Array.isArray(dados.participantes) ? dados.participantes : [];
+  const idsAtivacaoTemporaria = new Set(
+    (Array.isArray(dados.ativar_jogadores) ? dados.ativar_jogadores : [])
+      .map(Number)
+      .filter(Boolean),
+  );
 
   if (!["A", "B"].includes(divisao) || !alteracoes.length) {
     throw new Error("Nenhuma alteração de participante foi informada.");
   }
 
   const jogadores = getJogadores();
-  const jogadoresValidos = new Set(jogadores.filter((jogador) => jogador.ativo).map((jogador) => jogador.id));
+  const jogadoresValidos = new Set(
+    jogadores
+      .filter((jogador) => jogador.ativo || idsAtivacaoTemporaria.has(jogador.id))
+      .map((jogador) => jogador.id),
+  );
   alteracoes.forEach((alteracao) => {
     if (!Number(alteracao.numero) || !jogadoresValidos.has(Number(alteracao.jogador_id))) {
       throw new Error("Um dos participantes informados é inválido ou está inativo.");
@@ -96,11 +105,13 @@ function salvarParticipantesAdmin(dados) {
       numero: Number(linha[coluna("numero")]),
       jogador_id: Number(linha[coluna("jogador_id")]),
     }));
+    const idsSubstituidos = new Set();
     alteracoes.forEach((alteracao) => {
       const registro = estadoFinal.find((item) => item.divisao === divisao && item.numero === Number(alteracao.numero));
       if (!registro || !porChave[`${divisao}-${Number(alteracao.numero)}`]) {
         throw new Error(`Participante nº ${alteracao.numero} não encontrado na Série ${divisao}.`);
       }
+      idsSubstituidos.add(registro.jogador_id);
       registro.jogador_id = Number(alteracao.jogador_id);
     });
 
@@ -111,9 +122,36 @@ function salvarParticipantesAdmin(dados) {
       const registro = porChave[`${divisao}-${Number(alteracao.numero)}`];
       aba.getRange(registro.indice, coluna("jogador_id") + 1).setValue(Number(alteracao.jogador_id));
     });
+
+    const idsVinculados = new Set(estadoFinal.map((item) => item.jogador_id).filter(Boolean));
+    atualizarAtividadeJogadoresParticipantes(
+      [...new Set([...idsSubstituidos, ...alteracoes.map((item) => Number(item.jogador_id))])],
+      idsVinculados,
+    );
     delete CACHE[SHEETS.participantes];
+    delete CACHE[SHEETS.jogadores];
     return { sucesso: true, ...getParticipantesAdmin(divisao) };
   } finally {
     lock.releaseLock();
   }
+}
+
+function atualizarAtividadeJogadoresParticipantes(idsAfetados, idsVinculados) {
+  const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const aba = planilha.getSheetByName(SHEETS.jogadores);
+  const valores = aba.getDataRange().getDisplayValues();
+  const cabecalhos = valores[0].map((valor) => String(valor).trim().toLowerCase());
+  const colunaId = cabecalhos.indexOf("id");
+  const colunaAtivo = cabecalhos.indexOf("ativo");
+
+  if (colunaId < 0 || colunaAtivo < 0) {
+    throw new Error("A estrutura da aba Jogadores está incompleta.");
+  }
+
+  const afetados = new Set(idsAfetados.map(Number).filter(Boolean));
+  valores.slice(1).forEach((linha, indice) => {
+    const id = Number(linha[colunaId]);
+    if (!afetados.has(id)) return;
+    aba.getRange(indice + 2, colunaAtivo + 1).setValue(idsVinculados.has(id) ? "S" : "N");
+  });
 }

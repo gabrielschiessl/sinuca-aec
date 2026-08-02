@@ -18,8 +18,12 @@ import {
 const PAGE_ID = "admin-page";
 let activeAdminSession = null;
 let adminEditMode = false;
+let temporaryActivePlayers = new Map();
+let playerSearchMediaQuery = null;
+let playerSearchMediaHandler = null;
 
 export function renderAdministrador() {
+  temporaryActivePlayers = new Map();
   const app = document.getElementById("app");
 
   app.innerHTML = `
@@ -233,18 +237,46 @@ function renderDashboard(session) {
           <div><h2>Jogadores</h2><p>Cadastre jogadores e defina os nomes usados pelo sistema.</p></div>
           <button class="btn" type="button" data-add-player disabled><i class="bi bi-person-plus-fill"></i> Novo jogador</button>
         </div>
-        <p class="admin-module-note"><i class="bi bi-info-circle"></i> Jogadores não são excluídos: podem ser inativados para preservar temporadas anteriores. Participantes da temporada atual devem ser substituídos antes.</p>
+        <p class="admin-module-note"><i class="bi bi-info-circle"></i> O cadastro não vincula o jogador a uma divisão. A ativação sem vínculo vale somente nesta página; ela se torna permanente quando o jogador for vinculado em Participantes.</p>
+        <div class="admin-match-filters">
+          <label class="admin-match-filter">
+            <span><i class="bi bi-person-check-fill" aria-hidden="true"></i> Situação</span>
+            <select class="admin-select" data-player-status-filter>
+              <option value="">Ativos e inativos</option>
+              <option value="S">Somente ativos</option>
+              <option value="N">Somente inativos</option>
+            </select>
+          </label>
+          <label class="admin-match-filter">
+            <span><i class="bi bi-diagram-3-fill" aria-hidden="true"></i> Divisão atual</span>
+            <select class="admin-select" data-player-division-filter>
+              <option value="">Todas as divisões</option>
+              <option value="A">Série A</option>
+              <option value="B">Série B</option>
+              <option value="NONE">Sem divisão</option>
+            </select>
+          </label>
+        </div>
+        <label class="admin-player-search">
+          <span><i class="bi bi-search" aria-hidden="true"></i> Pesquisar jogador</span>
+          <input class="admin-input" type="search" placeholder="Nome completo, exibição ou apelido" autocomplete="off" data-player-search-filter>
+        </label>
         <div class="admin-bulk-actions">
           <span data-player-pending>Nenhuma alteração pendente</span>
           <button class="btn" type="button" data-save-players disabled>Salvar jogadores</button>
         </div>
         <div class="admin-player-list" data-admin-players></div>
+        <div class="admin-filter-empty" data-player-filter-empty hidden>
+          <i class="bi bi-person-x" aria-hidden="true"></i>
+          <p>Nenhum jogador encontrado.</p>
+        </div>
       </section>
 
     </section>
   `;
 
   page.querySelector("[data-enable-edit]")?.addEventListener("click", toggleAdminEditMode);
+  bindPlayerSearchPlaceholder();
   document.querySelectorAll("[data-admin-header-logout]").forEach((button) => { button.onclick = handleLogout; });
   page.querySelector("[data-admin-division]")?.addEventListener("change", (event) => loadAdminMatches(event.target.value, false));
   page.querySelector("[data-admin-round-filter]")?.addEventListener("change", applyAdminMatchFilters);
@@ -255,7 +287,28 @@ function renderDashboard(session) {
   page.querySelector("[data-save-participants]")?.addEventListener("click", saveParticipantChanges);
   page.querySelector("[data-add-player]")?.addEventListener("click", addNewPlayerRow);
   page.querySelector("[data-save-players]")?.addEventListener("click", savePlayerChanges);
+  page.querySelector("[data-player-status-filter]")?.addEventListener("change", applyAdminPlayerFilters);
+  page.querySelector("[data-player-division-filter]")?.addEventListener("change", applyAdminPlayerFilters);
+  page.querySelector("[data-player-search-filter]")?.addEventListener("input", applyAdminPlayerFilters);
   loadAdminMatches("A", false);
+}
+
+function bindPlayerSearchPlaceholder() {
+  if (playerSearchMediaQuery && playerSearchMediaHandler) {
+    playerSearchMediaQuery.removeEventListener("change", playerSearchMediaHandler);
+  }
+
+  playerSearchMediaQuery = window.matchMedia("(max-width: 345px)");
+  playerSearchMediaHandler = (event) => {
+    const input = getPage()?.querySelector("[data-player-search-filter]");
+    if (input) {
+      input.placeholder = event.matches
+        ? "Nome, exibição ou apelido"
+        : "Nome completo, exibição ou apelido";
+    }
+  };
+  playerSearchMediaQuery.addEventListener("change", playerSearchMediaHandler);
+  playerSearchMediaHandler(playerSearchMediaQuery);
 }
 
 function selectAdminTool(tool) {
@@ -331,7 +384,13 @@ async function loadAdminParticipants(divisao) {
   try {
     const data = await getAdminParticipantes(activeAdminSession.token, divisao);
     if (!content.isConnected) return;
-    content.innerHTML = data.participantes.map((participante) => renderParticipantRow(participante, data.jogadores)).join("");
+    const jogadoresDisponiveis = [...data.jogadores];
+    temporaryActivePlayers.forEach((jogador, id) => {
+      if (!jogadoresDisponiveis.some((item) => item.id === id)) {
+        jogadoresDisponiveis.push({ ...jogador, ativo: true });
+      }
+    });
+    content.innerHTML = data.participantes.map((participante) => renderParticipantRow(participante, jogadoresDisponiveis)).join("");
     content.dataset.loaded = "true";
     bindParticipantEvents();
     updateParticipantPendingCount();
@@ -407,7 +466,11 @@ async function saveParticipantChanges() {
   button.disabled = true;
   try {
     const divisao = page.querySelector("[data-participant-division]").value;
-    await saveAdminParticipantes(activeAdminSession.token, divisao, changes);
+    const ativarJogadores = changes
+      .map((change) => change.jogador_id)
+      .filter((id) => temporaryActivePlayers.has(id));
+    await saveAdminParticipantes(activeAdminSession.token, divisao, changes, ativarJogadores);
+    ativarJogadores.forEach((id) => temporaryActivePlayers.delete(id));
     const matchDivision = page.querySelector("[data-admin-division]").value;
     const refreshes = [
       loadAdminParticipants(divisao),
@@ -433,10 +496,14 @@ async function loadAdminPlayers() {
   try {
     const data = await getAdminJogadores(activeAdminSession.token);
     if (!content.isConnected) return;
-    content.innerHTML = data.jogadores.map((jogador) => renderPlayerRow(jogador)).join("");
+    const jogadores = data.jogadores.map((jogador) => (
+      temporaryActivePlayers.has(jogador.id) ? { ...jogador, ativo: true } : jogador
+    ));
+    content.innerHTML = jogadores.map((jogador) => renderPlayerRow(jogador)).join("");
     content.dataset.loaded = "true";
     bindPlayerEvents(content);
     updatePlayerPendingCount();
+    applyAdminPlayerFilters();
   } catch (error) {
     if (!content.isConnected) return;
     const message = /ação inválida/i.test(error.message)
@@ -455,7 +522,7 @@ function renderPlayerRow(jogador, novo = false) {
   const vinculo = jogador.participante_atual;
   const disabled = adminEditMode ? "" : "disabled";
 
-  return `<article class="admin-player-row${novo ? " is-dirty is-new" : ""}" data-player-row data-player-id="${id}" data-new="${novo}">
+  return `<article class="admin-player-row${novo ? " is-dirty is-new" : ""}" data-player-row data-player-id="${id}" data-player-active="${ativo ? "S" : "N"}" data-player-division="${vinculo?.divisao || "NONE"}" data-new="${novo}">
     <div class="admin-player-identity">
       <span class="admin-player-id">${id ? `#${id}` : "Novo"}</span>
       ${vinculo ? `<span class="admin-player-link">Série ${escapeHtml(vinculo.divisao)} · Nº ${vinculo.numero}</span>` : '<span class="admin-player-link">Sem vínculo atual</span>'}
@@ -473,21 +540,63 @@ function bindPlayerEvents(container = getPage()) {
     : [...(container?.querySelectorAll("[data-player-row]") || [])];
   rows.forEach((row) => {
     row.querySelectorAll("input, select").forEach((field) => {
-      field.addEventListener("input", () => updatePlayerDirtyState(row));
-      field.addEventListener("change", () => updatePlayerDirtyState(row));
+      const handleChange = () => {
+        updatePlayerDirtyState(row);
+        applyAdminPlayerFilters();
+      };
+      field.addEventListener("input", handleChange);
+      field.addEventListener("change", handleChange);
     });
   });
 }
 
 function addNewPlayerRow() {
   if (!adminEditMode) return;
-  const content = getPage()?.querySelector("[data-admin-players]");
+  const page = getPage();
+  const content = page?.querySelector("[data-admin-players]");
   if (!content) return;
-  content.insertAdjacentHTML("afterbegin", renderPlayerRow({ ativo: true }, true));
+  page.querySelector("[data-player-status-filter]").value = "";
+  page.querySelector("[data-player-division-filter]").value = "";
+  page.querySelector("[data-player-search-filter]").value = "";
+  content.insertAdjacentHTML("afterbegin", renderPlayerRow({ ativo: false }, true));
   const row = content.firstElementChild;
   bindPlayerEvents(row);
   row.querySelector("input")?.focus();
   updatePlayerPendingCount();
+  applyAdminPlayerFilters();
+}
+
+function applyAdminPlayerFilters() {
+  const page = getPage();
+  const status = page?.querySelector("[data-player-status-filter]")?.value || "";
+  const division = page?.querySelector("[data-player-division-filter]")?.value || "";
+  const search = normalizePlayerSearch(
+    page?.querySelector("[data-player-search-filter]")?.value || "",
+  );
+  let visiblePlayers = 0;
+  page?.querySelectorAll("[data-player-row]").forEach((row) => {
+    const currentStatus = row.querySelector('[data-player-field="ativo"]')?.value || row.dataset.playerActive;
+    const searchableNames = [...row.querySelectorAll('input[data-player-field]')]
+      .map((input) => input.value)
+      .join(" ");
+    const visible = (
+      (!status || currentStatus === status) &&
+      (!division || row.dataset.playerDivision === division) &&
+      (!search || normalizePlayerSearch(searchableNames).includes(search))
+    );
+    row.hidden = !visible;
+    if (visible) visiblePlayers += 1;
+  });
+  const empty = page?.querySelector("[data-player-filter-empty]");
+  if (empty) empty.hidden = visiblePlayers > 0;
+}
+
+function normalizePlayerSearch(value) {
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .trim();
 }
 
 function updatePlayerDirtyState(row) {
@@ -536,7 +645,18 @@ async function savePlayerChanges() {
   const button = page.querySelector("[data-save-players]");
   button.disabled = true;
   try {
-    await saveAdminJogadores(activeAdminSession.token, jogadores);
+    const result = await saveAdminJogadores(activeAdminSession.token, jogadores);
+    const temporarios = new Set(result.ativacoes_temporarias || []);
+    result.jogadores.forEach((jogador) => {
+      if (temporarios.has(jogador.id)) {
+        temporaryActivePlayers.set(jogador.id, { ...jogador, ativo: true });
+      } else if (
+        jogador.participante_atual ||
+        jogadores.some((alterado) => alterado.id === jogador.id && !alterado.ativo)
+      ) {
+        temporaryActivePlayers.delete(jogador.id);
+      }
+    });
     const participantDivision = page.querySelector("[data-participant-division]").value;
     const matchDivision = page.querySelector("[data-admin-division]").value;
     await Promise.all([
@@ -794,6 +914,7 @@ function confirmAdminChange(title, message) {
 
 async function handleLogout(event) {
   event.currentTarget.disabled = true;
+  temporaryActivePlayers = new Map();
 
   try {
     await endAdminSession();
