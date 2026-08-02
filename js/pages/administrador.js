@@ -29,6 +29,7 @@ let playerSearchMediaQuery = null;
 let playerSearchMediaHandler = null;
 let seasonDraft = null;
 let savedSeasonDraft = null;
+let searchablePlayerSelectsBound = false;
 
 window.addEventListener("beforeunload", (event) => {
   if (!isSeasonDirty()) return;
@@ -412,6 +413,7 @@ function toggleAdminEditMode(event) {
     });
     updatePlayerDirtyState(row);
   });
+  syncSearchablePlayerComboboxes(dashboard);
   updatePlayerPendingCount();
 }
 
@@ -503,7 +505,7 @@ function renderSeasonEditor() {
   const editor = page?.querySelector("[data-season-editor]");
   if (!editor || !seasonDraft) return;
   const players = seasonDraft.jogadores || [];
-  const options = (selected) => players.map((player) => `<option value="${player.id}" ${Number(selected) === Number(player.id) ? "selected" : ""}>${escapeHtml(player.exibicao)}${player.ativo ? "" : " (inativo)"}</option>`).join("");
+  const options = (selected) => players.map((player) => `<option value="${player.id}" data-player-search="${escapeHtml([player.nome, player.exibicao, player.apelido].filter(Boolean).join(" "))}" ${Number(selected) === Number(player.id) ? "selected" : ""}>${escapeHtml(player.exibicao)}${player.ativo ? "" : " (inativo)"}</option>`).join("");
   const rows = (division) => seasonDraft.participantes[division].map((participant, index) => `
     <div class="admin-season-participant" data-season-participant data-division="${division}">
       <span>${index + 1}</span><select class="admin-select" ${adminEditMode ? "" : "disabled"}>${options(participant.jogador_id)}</select>
@@ -518,6 +520,7 @@ function renderSeasonEditor() {
     </div>
     <div class="admin-season-actions"><button class="btn btn-admin-secondary" type="button" data-cancel-season>Cancelar alterações</button><button class="btn" type="button" data-save-season ${adminEditMode ? "" : "disabled"}>Salvar temporada</button></div>`;
   editor.querySelectorAll("[data-season-participant] select").forEach((select) => select.addEventListener("change", syncSeasonDraftFromEditor));
+  editor.querySelectorAll("[data-season-participant] select").forEach(enhanceSearchablePlayerSelect);
   editor.querySelectorAll("[data-remove-season-player]").forEach((button) => button.addEventListener("click", removeSeasonPlayer));
   editor.querySelector("[data-add-season-player]")?.addEventListener("click", addSeasonPlayer);
   editor.querySelector("[data-cancel-season]")?.addEventListener("click", cancelSeasonChanges);
@@ -672,7 +675,7 @@ function renderParticipantRow(participante, jogadores) {
   const options = jogadores
     .slice()
     .sort((a, b) => a.exibicao.localeCompare(b.exibicao, "pt-BR"))
-    .map((jogador) => `<option value="${jogador.id}" ${jogador.id === participante.jogador_id ? "selected" : ""}>${escapeHtml(jogador.exibicao)}${jogador.ativo ? "" : " (inativo)"}</option>`)
+    .map((jogador) => `<option value="${jogador.id}" data-player-search="${escapeHtml([jogador.nome, jogador.exibicao, jogador.apelido].filter(Boolean).join(" "))}" ${jogador.id === participante.jogador_id ? "selected" : ""}>${escapeHtml(jogador.exibicao)}${jogador.ativo ? "" : " (inativo)"}</option>`)
     .join("");
   return `<article class="admin-participant-row" data-participant-row data-number="${participante.numero}">
     <span class="admin-participant-number">${participante.numero}</span>
@@ -683,6 +686,104 @@ function renderParticipantRow(participante, jogadores) {
 function bindParticipantEvents() {
   getPage()?.querySelectorAll("[data-participant-select]").forEach((select) => {
     select.addEventListener("change", () => updateParticipantDirtyState(select.closest("[data-participant-row]")));
+    enhanceSearchablePlayerSelect(select);
+  });
+}
+
+function enhanceSearchablePlayerSelect(select) {
+  if (!select || select.dataset.searchableEnhanced === "true") return;
+  select.dataset.searchableEnhanced = "true";
+  select.classList.add("admin-search-select-native");
+
+  const combobox = document.createElement("div");
+  combobox.className = "admin-player-combobox";
+  combobox.innerHTML = `
+    <div class="admin-player-combobox-control">
+      <i class="bi bi-search" aria-hidden="true"></i>
+      <input type="search" autocomplete="off" aria-label="Pesquisar e selecionar jogador">
+      <i class="bi bi-chevron-down admin-player-combobox-chevron" aria-hidden="true"></i>
+    </div>
+    <div class="admin-player-combobox-menu" role="listbox" hidden></div>`;
+  select.insertAdjacentElement("afterend", combobox);
+
+  const input = combobox.querySelector("input");
+  const menu = combobox.querySelector("[role='listbox']");
+  const renderOptions = (query = "") => {
+    const normalizedQuery = normalizePlayerSearch(query);
+    const options = [...select.options].filter((option) =>
+      !normalizedQuery || normalizePlayerSearch(option.dataset.playerSearch || option.textContent).includes(normalizedQuery)
+    );
+    menu.innerHTML = options.length
+      ? options.map((option) => `<button type="button" role="option" data-player-option="${escapeHtml(option.value)}" aria-selected="${option.selected}">${escapeHtml(option.textContent)}</button>`).join("")
+      : '<p class="admin-player-combobox-empty">Nenhum jogador encontrado.</p>';
+    menu.querySelectorAll("[data-player-option]").forEach((button) => {
+      button.addEventListener("click", () => {
+        select.value = button.dataset.playerOption;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+        input.value = select.options[select.selectedIndex]?.textContent || "";
+        closeSearchablePlayerCombobox(combobox);
+      });
+    });
+  };
+  const open = () => {
+    if (select.disabled) return;
+    closeAllSearchablePlayerComboboxes(combobox);
+    combobox.classList.add("is-open");
+    menu.hidden = false;
+    input.value = "";
+    input.placeholder = "Digite para pesquisar...";
+    renderOptions();
+  };
+
+  input.value = select.options[select.selectedIndex]?.textContent || "";
+  input.disabled = select.disabled;
+  input.addEventListener("focus", open);
+  input.addEventListener("click", open);
+  input.addEventListener("input", () => renderOptions(input.value));
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeSearchablePlayerCombobox(combobox);
+      input.blur();
+    }
+  });
+  select.addEventListener("change", () => {
+    input.value = select.options[select.selectedIndex]?.textContent || "";
+  });
+
+  if (!searchablePlayerSelectsBound) {
+    searchablePlayerSelectsBound = true;
+    document.addEventListener("pointerdown", (event) => {
+      if (!event.target.closest(".admin-player-combobox")) {
+        closeAllSearchablePlayerComboboxes();
+      }
+    });
+  }
+}
+
+function closeSearchablePlayerCombobox(combobox) {
+  if (!combobox) return;
+  const select = combobox.previousElementSibling;
+  const input = combobox.querySelector("input");
+  combobox.classList.remove("is-open");
+  combobox.querySelector("[role='listbox']").hidden = true;
+  input.placeholder = "";
+  input.value = select?.options[select.selectedIndex]?.textContent || "";
+}
+
+function closeAllSearchablePlayerComboboxes(exception = null) {
+  document.querySelectorAll(".admin-player-combobox.is-open").forEach((combobox) => {
+    if (combobox !== exception) closeSearchablePlayerCombobox(combobox);
+  });
+}
+
+function syncSearchablePlayerComboboxes(container = document) {
+  container.querySelectorAll("select.admin-search-select-native").forEach((select) => {
+    const combobox = select.nextElementSibling;
+    const input = combobox?.querySelector("input");
+    if (!input) return;
+    input.disabled = select.disabled;
+    input.value = select.options[select.selectedIndex]?.textContent || "";
+    if (select.disabled) closeSearchablePlayerCombobox(combobox);
   });
 }
 
