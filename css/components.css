@@ -1055,6 +1055,7 @@
 
 @media (max-width: 480px) {
   .admin-management-tabs button { padding:5px 2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:.7rem; }
+  .admin-player-search .admin-input { font-size:16px; }
   .admin-player-row { grid-template-columns:1fr; }
   .admin-player-identity { grid-column:auto; }
   .admin-page {

@@ -298,7 +298,7 @@ function bindPlayerSearchPlaceholder() {
     playerSearchMediaQuery.removeEventListener("change", playerSearchMediaHandler);
   }
 
-  playerSearchMediaQuery = window.matchMedia("(max-width: 345px)");
+  playerSearchMediaQuery = window.matchMedia("(max-width: 400px)");
   playerSearchMediaHandler = (event) => {
     const input = getPage()?.querySelector("[data-player-search-filter]");
     if (input) {
