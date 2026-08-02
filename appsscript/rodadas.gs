@@ -32,6 +32,148 @@ function getRodadas(serie) {
   return agruparRodadas(resultado);
 }
 
+function getPartidasAdmin(serie) {
+  return getRodadas(serie).map((rodada) => ({
+    ...rodada,
+    partidas: rodada.partidas.map((partida) => ({
+      ...partida,
+      edicao: { pode_editar: true, pode_salvar: true },
+    })),
+  }));
+}
+
+function salvarPartidaAdmin(dados) {
+  const divisao = String(dados.divisao || "").trim().toUpperCase();
+  const temporada = getTemporadaAtual();
+  const rodada = Number(dados.rodada);
+  const numero1 = Number(dados.numero1);
+  const numero2 = Number(dados.numero2);
+  const validado = validarEstadoPartida(
+    dados.status,
+    dados.placar1,
+    dados.placar2,
+  );
+
+  if (!['A', 'B'].includes(divisao) || !rodada || !numero1 || !numero2) {
+    throw new Error("Partida inválida ou incompleta.");
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+
+  try {
+    const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const aba = planilha.getSheetByName(SHEETS.rodadas);
+    const valores = aba.getDataRange().getDisplayValues();
+    const cabecalhos = valores[0].map((valor) =>
+      String(valor).trim().toLowerCase(),
+    );
+    const coluna = (nome) => cabecalhos.indexOf(nome);
+    const indice = valores.findIndex(
+      (linha, linhaIndice) =>
+        linhaIndice > 0 &&
+        Number(linha[coluna("temporada")]) === temporada &&
+        String(linha[coluna("divisao")]).trim().toUpperCase() === divisao &&
+        Number(linha[coluna("rodada")]) === rodada &&
+        Number(linha[coluna("numero1")]) === numero1 &&
+        Number(linha[coluna("numero2")]) === numero2,
+    );
+
+    if (indice < 1) throw new Error("Partida não encontrada.");
+
+    const linhaPlanilha = indice + 1;
+    aba.getRange(linhaPlanilha, coluna("status") + 1).setValue(validado.status);
+    aba
+      .getRange(linhaPlanilha, coluna("placar1") + 1)
+      .setValue(validado.placar1);
+    aba
+      .getRange(linhaPlanilha, coluna("placar2") + 1)
+      .setValue(validado.placar2);
+    aba
+      .getRange(linhaPlanilha, coluna("atualizado_em") + 1)
+      .setValue(new Date());
+
+    return {
+      sucesso: true,
+      status: validado.status,
+      placar1: validado.placar1,
+      placar2: validado.placar2,
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function salvarPartidasAdmin(dados) {
+  const partidas = Array.isArray(dados.partidas) ? dados.partidas : [];
+  if (!partidas.length) throw new Error("Nenhuma partida foi informada.");
+
+  partidas.forEach((partida) => {
+    const divisao = String(partida.divisao || "").trim().toUpperCase();
+    if (!["A", "B"].includes(divisao) || !Number(partida.rodada) || !Number(partida.numero1) || !Number(partida.numero2)) {
+      throw new Error("Uma das partidas está inválida ou incompleta.");
+    }
+    validarEstadoPartida(partida.status, partida.placar1, partida.placar2);
+  });
+
+  const resultados = partidas.map((partida) => ({
+    divisao: String(partida.divisao).trim().toUpperCase(),
+    rodada: Number(partida.rodada),
+    numero1: Number(partida.numero1),
+    numero2: Number(partida.numero2),
+    ...salvarPartidaAdmin(partida),
+  }));
+
+  delete CACHE[SHEETS.rodadas];
+
+  return { sucesso: true, partidas: resultados };
+}
+
+function validarEstadoPartida(statusInformado, placar1Informado, placar2Informado) {
+  let status = String(statusInformado || "").trim().toUpperCase();
+
+  if (!['A', 'V', 'E'].includes(status)) {
+    throw new Error("Selecione um status válido para a partida.");
+  }
+
+  const vazio1 = placar1Informado === "" || placar1Informado === null || placar1Informado === undefined || placar1Informado === "-";
+  const vazio2 = placar2Informado === "" || placar2Informado === null || placar2Informado === undefined || placar2Informado === "-";
+
+  if (status === 'A') {
+    if (!vazio1 || !vazio2) {
+      throw new Error("Partida agendada não pode possuir placar.");
+    }
+    return { status: 'A', placar1: '-', placar2: '-' };
+  }
+
+  if (vazio1 || vazio2) {
+    throw new Error("Informe os dois placares para uma partida ao vivo ou encerrada.");
+  }
+
+  const placar1 = Number(placar1Informado);
+  const placar2 = Number(placar2Informado);
+  const valido = (placar) => Number.isInteger(placar) && placar >= 0 && placar <= 2;
+
+  if (!valido(placar1) || !valido(placar2)) {
+    throw new Error("O placar deve conter valores inteiros entre 0 e 2.");
+  }
+
+  if (placar1 === 2 || placar2 === 2) status = 'E';
+
+  if (status === 'V' && (placar1 > 1 || placar2 > 1)) {
+    throw new Error("Partida ao vivo aceita somente placares até 1 ponto.");
+  }
+
+  if (status === 'E') {
+    const vencedores = [placar1, placar2].filter((placar) => placar === 2).length;
+    if (vencedores !== 1 || placar1 === placar2) {
+      throw new Error("Partida encerrada exige exatamente um jogador com 2 pontos.");
+    }
+  }
+
+  return { status, placar1, placar2 };
+}
+
 /************************************************
  * Monta uma partida completa
  ************************************************/

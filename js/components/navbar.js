@@ -87,7 +87,17 @@ export function renderNavbar({ title = "" } = {}) {
     </div>
 
     <div class="header-right">
-
+      ${isAdminPage ? `
+        <div class="admin-desktop admin-header-session is-hidden" data-admin-header-session>
+          <button class="btn btn-outline" type="button" data-admin-header-logout>
+            <i class="bi bi-box-arrow-right" aria-hidden="true"></i> Sair
+          </button>
+        </div>
+        <div class="admin-mobile admin-header-session is-hidden" data-admin-header-session>
+          <button class="icon-button" type="button" data-admin-header-logout aria-label="Sair da área administrativa" title="Sair">
+            <i class="bi bi-box-arrow-right"></i>
+          </button>
+        </div>` : `
         <div class="admin-desktop">
     <button class="btn btn-outline" type="button" data-route="/administrador">
         Administrador
@@ -104,7 +114,7 @@ export function renderNavbar({ title = "" } = {}) {
     >
         <i class="bi bi-person-fill"></i>
     </button>
-</div>
+</div>`}
 
     </div>
 

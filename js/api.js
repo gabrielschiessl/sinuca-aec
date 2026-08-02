@@ -113,3 +113,38 @@ export function validateAdminSession(token) {
 export function logoutAdmin(token) {
   return post({ acao: "logout", token });
 }
+
+export function getAdminPartidas(token, divisao) {
+  return post({ acao: "admin_partidas", token, divisao });
+}
+
+export function saveAdminPartida(token, partida) {
+  return post({ acao: "salvar_partida", token, ...partida }).then((result) => {
+    cache.clear();
+    return result;
+  });
+}
+
+export function saveAdminPartidas(token, partidas) {
+  return post({ acao: "salvar_partidas", token, partidas })
+    .catch(async (error) => {
+      if (!/ação inválida/i.test(error.message)) throw error;
+
+      const resultados = [];
+      for (const partida of partidas) {
+        const result = await post({ acao: "salvar_partida", token, ...partida });
+        resultados.push({
+          divisao: partida.divisao,
+          rodada: Number(partida.rodada),
+          numero1: Number(partida.numero1),
+          numero2: Number(partida.numero2),
+          ...result,
+        });
+      }
+      return { sucesso: true, partidas: resultados, compatibilidade: true };
+    })
+    .then((result) => {
+      cache.clear();
+      return result;
+    });
+}

@@ -170,6 +170,10 @@
   display: none;
 }
 
+.admin-header-session.is-hidden {
+  display: none !important;
+}
+
 .admin-title-logo {
   display: block;
   width: 170px;

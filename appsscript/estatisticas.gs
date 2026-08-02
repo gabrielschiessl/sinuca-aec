@@ -68,6 +68,8 @@ function calcularEstatisticasSerie({
   });
 
   partidasDaSerie.forEach((partida) => {
+    if (String(partida.status).trim().toUpperCase() !== "E") return;
+
     const placar1 = normalizarPlacar(partida.placar1);
     const placar2 = normalizarPlacar(partida.placar2);
 

@@ -42,6 +42,18 @@ function doPost(e) {
       case "validar_sessao":
         return responder(validarSessaoAdmin(dados.token));
 
+      case "admin_partidas":
+        validarSessaoAdmin(dados.token);
+        return responder(getPartidasAdmin(dados.divisao || "A"));
+
+      case "salvar_partida":
+        validarSessaoAdmin(dados.token);
+        return responder(salvarPartidasAdmin({ partidas: [dados] }).partidas[0]);
+
+      case "salvar_partidas":
+        validarSessaoAdmin(dados.token);
+        return responder(salvarPartidasAdmin(dados));
+
       case "logout":
         encerrarSessaoAdmin(dados.token);
         return responder({ sucesso: true });
