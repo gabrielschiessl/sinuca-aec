@@ -20,9 +20,36 @@ function doGet(e) {
     case "rodadas":
       return responder(getRodadas(e.parameter.serie || "A"));
 
+    case "estatisticas":
+      return responder(getEstatisticas(e.parameter.serie || "A"));
+
     default:
       return responder({
         erro: "Ação inválida.",
       });
+  }
+}
+
+function doPost(e) {
+  try {
+    const dados = JSON.parse(e.postData.contents || "{}");
+    const acao = dados.acao || "";
+
+    switch (acao) {
+      case "login_google":
+        return responder(loginComGoogle(dados.credential));
+
+      case "validar_sessao":
+        return responder(validarSessaoAdmin(dados.token));
+
+      case "logout":
+        encerrarSessaoAdmin(dados.token);
+        return responder({ sucesso: true });
+
+      default:
+        return responder({ erro: "Ação inválida." });
+    }
+  } catch (error) {
+    return responder({ erro: error.message || "Erro inesperado." });
   }
 }

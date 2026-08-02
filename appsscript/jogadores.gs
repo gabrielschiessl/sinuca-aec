@@ -10,23 +10,15 @@
 function getJogadores() {
   const dados = getSheetAsObjects(SHEETS.jogadores);
 
-  return {
-    A: dados
-      .filter((j) => j.id_a)
-      .map((j) => ({
-        id: Number(j.id_a),
-        nome: j.jogador_a,
-        apelido: j.apelido_a || j.jogador_a,
-      })),
-
-    B: dados
-      .filter((j) => j.id_b)
-      .map((j) => ({
-        id: Number(j.id_b),
-        nome: j.jogador_b,
-        apelido: j.apelido_b || j.jogador_b,
-      })),
-  };
+  return dados
+    .filter((jogador) => jogador.id)
+    .map((jogador) => ({
+      id: Number(jogador.id),
+      nome: jogador.nome,
+      exibicao: jogador.exibicao || jogador.nome,
+      apelido: jogador.apelido || jogador.exibicao || jogador.nome,
+      ativo: String(jogador.ativo).trim().toUpperCase() === "S",
+    }));
 }
 
 /************************************************

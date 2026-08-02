@@ -170,6 +170,31 @@
   display: none;
 }
 
+.admin-title-logo {
+  display: block;
+  width: 170px;
+  max-height: 58px;
+  object-fit: contain;
+}
+
+@media (max-width: 560px) {
+  .header-left {
+    width: auto;
+  }
+
+  .header-left .logo {
+    height: 35px;
+  }
+
+  .admin-desktop {
+    display: none;
+  }
+
+  .admin-mobile {
+    display: flex;
+  }
+}
+
 /* Conteúdo */
 
 main {
@@ -237,6 +262,11 @@ main {
 
   .admin-mobile {
     display: flex;
+  }
+
+  .admin-title-logo {
+    width: 118px;
+    max-height: 48px;
   }
 
   .header-center-icon {

@@ -1,6 +1,7 @@
 import { BASE_PATH } from "../config.js";
 
 export function renderNavbar({ title = "" } = {}) {
+  const isAdminPage = title === "Administrador";
   const alternateDivision =
     title === "Série A"
       ? { title: "Série B", route: "/serie-b" }
@@ -64,12 +65,20 @@ export function renderNavbar({ title = "" } = {}) {
           </div>
         </div>`
             : `
-        <img
-          src="${BASE_PATH}/assets/images/esporte_icone_branco.png"
-          class="header-center-icon"
-          alt=""
-        >
-        <span class="header-title">${title}</span>`
+        ${
+          isAdminPage
+            ? `<img
+                src="${BASE_PATH}/assets/images/esporte_branco.png"
+                class="admin-title-logo"
+                alt="Sinuca"
+              >`
+            : `<img
+                src="${BASE_PATH}/assets/images/esporte_icone_branco.png"
+                class="header-center-icon"
+                alt=""
+              >
+              <span class="header-title">${title}</span>`
+        }`
         }
     `
             : ""
@@ -79,13 +88,19 @@ export function renderNavbar({ title = "" } = {}) {
     <div class="header-right">
 
         <div class="admin-desktop">
-    <button class="btn btn-outline">
+    <button class="btn btn-outline" type="button" data-route="/administrador">
         Administrador
     </button>
 </div>
 
 <div class="admin-mobile">
-    <button class="icon-button">
+    <button
+      class="icon-button"
+      type="button"
+      data-route="/administrador"
+      aria-label="Abrir área administrativa"
+      title="Administrador"
+    >
         <i class="bi bi-person-fill"></i>
     </button>
 </div>

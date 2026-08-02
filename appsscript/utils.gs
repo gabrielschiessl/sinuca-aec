@@ -107,15 +107,15 @@ function agruparRodadas(partidas) {
       const totalPartidas = rodada.partidas.length;
 
       const partidasEncerradas = rodada.partidas.filter(
-        (p) => p.status === "E",
+        (p) => p.status.codigo === "E",
       ).length;
 
       const partidasAoVivo = rodada.partidas.filter(
-        (p) => p.status === "V",
+        (p) => p.status.codigo === "V",
       ).length;
 
       const partidasAgendadas = rodada.partidas.filter(
-        (p) => p.status === "A",
+        (p) => p.status.codigo === "A",
       ).length;
 
       return {

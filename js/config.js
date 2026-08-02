@@ -4,6 +4,9 @@ export const BASE_PATH =
     ? ""
     : "/sinuca-aec";
 
+export const GOOGLE_CLIENT_ID =
+  "242727081932-ep06g0j80nti9593b2jv456b27llbgjp.apps.googleusercontent.com";
+
 export function withBasePath(path = "/") {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 

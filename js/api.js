@@ -17,7 +17,35 @@ async function request(acao, params = {}) {
     throw new Error("Erro ao acessar a API.");
   }
 
-  return response.json();
+  const data = await response.json();
+
+  if (data?.erro) {
+    throw new Error(data.erro);
+  }
+
+  return data;
+}
+
+async function post(data) {
+  const response = await fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8",
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    throw new Error("Erro ao acessar a API.");
+  }
+
+  const result = await response.json();
+
+  if (result?.erro) {
+    throw new Error(result.erro);
+  }
+
+  return result;
 }
 
 async function requestCached(key, requestData) {
@@ -56,4 +84,32 @@ export async function getRodadas(divisao) {
       serie: divisao,
     }),
   );
+}
+
+/************************************************
+ * Estatísticas
+ ************************************************/
+
+export async function getEstatisticas(divisao) {
+  return requestCached(`estatisticas:${divisao}`, () =>
+    request("estatisticas", {
+      serie: divisao,
+    }),
+  );
+}
+
+/************************************************
+ * Administração
+ ************************************************/
+
+export function loginGoogle(credential) {
+  return post({ acao: "login_google", credential });
+}
+
+export function validateAdminSession(token) {
+  return post({ acao: "validar_sessao", token });
+}
+
+export function logoutAdmin(token) {
+  return post({ acao: "logout", token });
 }
