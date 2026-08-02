@@ -6,12 +6,12 @@ export function tabs(items) {
 
 ${items
   .map(
-    (tab) => `
+    (tab, index) => `
 
 
 <button
 
-class="tab-button ${tab.id === "rodadas" ? "active" : ""}"
+class="tab-button ${index === 0 ? "active" : ""}"
 
 data-tab="${tab.id}"
 

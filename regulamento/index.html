@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AEC Sinuca</title>
+    <script>
+      const basePath =
+        window.location.hostname === "127.0.0.1" ||
+        window.location.hostname === "localhost"
+          ? ""
+          : "/sinuca-aec";
+
+      window.location.replace(
+        `${basePath}/?route=${encodeURIComponent("/regulamento")}`,
+      );
+    </script>
+  </head>
+  <body></body>
+</html>

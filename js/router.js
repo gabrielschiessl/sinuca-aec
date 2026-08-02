@@ -2,6 +2,7 @@ import { renderHome } from "./pages/home.js";
 import { renderSerieA } from "./pages/serieA.js";
 import { renderSerieB } from "./pages/serieB.js";
 import { renderAdministrador } from "./pages/administrador.js";
+import { renderRegulamento } from "./pages/regulamento.js";
 import { withBasePath, withoutBasePath } from "./config.js";
 
 const routes = {
@@ -9,6 +10,7 @@ const routes = {
   "/serie-a": renderSerieA,
   "/serie-b": renderSerieB,
   "/administrador": renderAdministrador,
+  "/regulamento": renderRegulamento,
 };
 
 export function router() {

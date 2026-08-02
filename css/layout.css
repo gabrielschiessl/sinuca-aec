@@ -193,6 +193,14 @@
   .admin-mobile {
     display: flex;
   }
+
+  .rules-title-icon {
+    display: none;
+  }
+
+  .header-center .rules-title-text {
+    font-size: 1.25rem;
+  }
 }
 
 /* Conteúdo */

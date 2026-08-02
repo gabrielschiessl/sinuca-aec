@@ -31,6 +31,12 @@ ${renderNavbar()}
       text: "Série B",
     })}
 
+    ${menuButton({
+      route: "/regulamento",
+      icon: "bi bi-journal-text",
+      text: "Regulamento",
+    })}
+
 </div>
   </section>
 
