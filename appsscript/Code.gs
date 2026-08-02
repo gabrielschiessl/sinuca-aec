@@ -54,6 +54,18 @@ function doPost(e) {
         validarSessaoAdmin(dados.token);
         return responder(getJogadoresAdmin());
 
+      case "admin_temporadas":
+        validarSessaoAdmin(dados.token);
+        return responder(getTemporadasAdmin());
+
+      case "preparar_temporada":
+        validarSessaoAdmin(dados.token);
+        return responder(prepararNovaTemporada(dados.temporada));
+
+      case "carregar_temporada":
+        validarSessaoAdmin(dados.token);
+        return responder(getTemporadaPreparacao(dados.temporada));
+
       case "salvar_participantes":
         validarSessaoAdmin(dados.token);
         return responder(salvarParticipantesAdmin(dados));
@@ -61,6 +73,14 @@ function doPost(e) {
       case "salvar_jogadores":
         validarSessaoAdmin(dados.token);
         return responder(salvarJogadoresAdmin(dados));
+
+      case "salvar_temporada":
+        validarSessaoAdmin(dados.token);
+        return responder(salvarTemporadaPreparacao(dados));
+
+      case "excluir_temporada":
+        validarSessaoAdmin(dados.token);
+        return responder(excluirTemporadaPreparacao(dados.temporada));
 
       case "salvar_partida":
         validarSessaoAdmin(dados.token);

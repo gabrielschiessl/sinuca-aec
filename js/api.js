@@ -126,6 +126,18 @@ export function getAdminJogadores(token) {
   return post({ acao: "admin_jogadores", token });
 }
 
+export function getAdminTemporadas(token) {
+  return post({ acao: "admin_temporadas", token });
+}
+
+export function prepareAdminTemporada(token, temporada) {
+  return post({ acao: "preparar_temporada", token, temporada });
+}
+
+export function getAdminTemporada(token, temporada) {
+  return post({ acao: "carregar_temporada", token, temporada });
+}
+
 export function saveAdminParticipantes(token, divisao, participantes, ativarJogadores = []) {
   return post({
     acao: "salvar_participantes",
@@ -141,6 +153,20 @@ export function saveAdminParticipantes(token, divisao, participantes, ativarJoga
 
 export function saveAdminJogadores(token, jogadores) {
   return post({ acao: "salvar_jogadores", token, jogadores }).then((result) => {
+    cache.clear();
+    return result;
+  });
+}
+
+export function saveAdminTemporada(token, temporada, participantes) {
+  return post({ acao: "salvar_temporada", token, temporada, participantes }).then((result) => {
+    cache.clear();
+    return result;
+  });
+}
+
+export function deleteAdminTemporada(token, temporada) {
+  return post({ acao: "excluir_temporada", token, temporada }).then((result) => {
     cache.clear();
     return result;
   });

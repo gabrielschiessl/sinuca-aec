@@ -20,6 +20,10 @@ const SHEETS = {
 
   participantes: "Participantes",
 
-  rodadas: "Rodadas"
+  rodadas: "Rodadas",
+
+  temporadas: "Temporadas",
+
+  temporadasParticipantes: "Temporadas Participantes"
 
 };
