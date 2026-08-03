@@ -3,6 +3,7 @@ import { BASE_PATH } from "../config.js";
 export function renderNavbar({ title = "" } = {}) {
   const isAdminPage = title === "Administrador";
   const isRulesPage = title === "Regulamento";
+  const isHistoryPage = title === "Histórico";
   const alternateDivision =
     title === "Série A"
       ? { title: "Série B", route: "/serie-b" }
@@ -67,7 +68,7 @@ export function renderNavbar({ title = "" } = {}) {
         </div>`
             : `
         ${
-          isAdminPage || isRulesPage
+          isAdminPage || isRulesPage || isHistoryPage
             ? `<img
                 src="${BASE_PATH}/assets/images/esporte_branco.png"
                 class="admin-title-logo"

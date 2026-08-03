@@ -3,8 +3,8 @@
  * Estatísticas e classificação
  ************************************************/
 
-function getEstatisticas(serie) {
-  const temporada = getTemporadaAtual();
+function getEstatisticas(serie, temporadaInformada) {
+  const temporada = validarTemporadaPublica(temporadaInformada);
   const divisao = String(serie).trim().toUpperCase();
   const participantes = getSheetAsObjects(SHEETS.participantes);
   const jogadores = getSheetAsObjects(SHEETS.jogadores);
@@ -17,6 +17,39 @@ function getEstatisticas(serie) {
     jogadores,
     partidas,
   });
+}
+
+function getTemporadasPublicas() {
+  garantirEstruturaTemporadas();
+  const temporadaAtual = getTemporadaAtual();
+  return {
+    temporada_atual: temporadaAtual,
+    temporadas: getSheetAsObjects(SHEETS.temporadas)
+      .filter((item) => {
+        const status = String(item.status).trim().toUpperCase();
+        return status === TEMPORADA_STATUS.ATIVA || status === TEMPORADA_STATUS.ARQUIVADA;
+      })
+      .map((item) => Number(item.temporada))
+      .filter(Number.isInteger)
+      .sort((a, b) => b - a),
+  };
+}
+
+function validarTemporadaPublica(valor) {
+  if (valor === "" || valor === null || valor === undefined) {
+    return getTemporadaAtual();
+  }
+  const temporada = Number(valor);
+  const publica = getSheetAsObjects(SHEETS.temporadas).some((item) =>
+    Number(item.temporada) === temporada &&
+    [TEMPORADA_STATUS.ATIVA, TEMPORADA_STATUS.ARQUIVADA].includes(
+      String(item.status).trim().toUpperCase(),
+    ),
+  );
+  if (!Number.isInteger(temporada) || !publica) {
+    throw new Error("Temporada não encontrada no histórico.");
+  }
+  return temporada;
 }
 
 function calcularEstatisticasSerie({

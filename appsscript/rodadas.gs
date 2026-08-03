@@ -7,8 +7,8 @@
  * Retorna as rodadas de uma série
  ************************************************/
 
-function getRodadas(serie) {
-  const temporada = getTemporadaAtual();
+function getRodadas(serie, temporadaInformada) {
+  const temporada = validarTemporadaPublica(temporadaInformada);
 
   const serieNormalizada = String(serie).trim().toUpperCase();
 

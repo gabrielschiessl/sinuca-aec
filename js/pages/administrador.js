@@ -13,12 +13,14 @@ import {
   getAdminTemporada,
   getAdminTemporadas,
   prepareAdminTemporada,
+  activateAdminTemporada,
   deleteAdminTemporada,
   saveAdminJogadores,
   saveAdminPartidas,
   saveAdminParticipantes,
   saveAdminTemporada,
 } from "../api.js";
+import { setKnownCurrentSeason } from "../config.js";
 
 const PAGE_ID = "admin-page";
 const CREATE_SEASON_BUTTON_HTML = '<i class="bi bi-plus-circle"></i> Criar temporada';
@@ -439,7 +441,7 @@ function renderSeasonList(data) {
   const seasons = data.temporadas || [];
   container.innerHTML = seasons.map((season) => `
     <article class="admin-season-summary ${season.status === "ATIVA" ? "is-current" : ""}">
-      <div><strong>Temporada ${season.temporada}</strong><span>${season.status === "ATIVA" ? "Atual e publicada" : "Preparação salva"}</span></div>
+      <div><strong>Temporada ${season.temporada}</strong><span>${season.status === "ATIVA" ? "Atual e publicada" : season.status === "ARQUIVADA" ? "Temporada histórica" : "Preparação salva"}</span></div>
       <small>Série A: ${season.participantes_a} · Série B: ${season.participantes_b}</small>
       ${season.status === "PREPARACAO" ? `<button class="btn btn-admin-secondary" type="button" data-edit-season="${season.temporada}">Editar</button>` : ""}
     </article>`).join("");
@@ -513,7 +515,7 @@ function renderSeasonEditor() {
     </div>`).join("");
   editor.hidden = false;
   editor.innerHTML = `
-    <div class="admin-season-editor-heading"><div><strong>Temporada ${seasonDraft.temporada}</strong><span>${seasonDraft.persistida ? "Preparação salva" : "Novo rascunho não salvo"}</span></div>${seasonDraft.persistida ? '<button class="btn btn-admin-danger" type="button" data-delete-season>Excluir temporada</button>' : ""}</div>
+    <div class="admin-season-editor-heading"><div><strong>Temporada ${seasonDraft.temporada}</strong><span>${seasonDraft.persistida ? "Preparação salva" : "Novo rascunho não salvo"}</span></div>${seasonDraft.persistida ? '<div class="admin-season-editor-controls"><button class="btn" type="button" data-activate-season>Ativar temporada</button><button class="btn btn-admin-danger" type="button" data-delete-season>Excluir temporada</button></div>' : ""}</div>
     <div class="admin-season-divisions">
       <section><h3>Série A <small>20 participantes</small></h3><div data-season-list="A">${rows("A")}</div></section>
       <section><h3>Série B <small>${seasonDraft.participantes.B.length} participantes</small></h3><div data-season-list="B">${rows("B")}</div><button class="btn btn-admin-secondary admin-season-add" type="button" data-add-season-player ${adminEditMode ? "" : "disabled"}><i class="bi bi-person-plus"></i> Adicionar participante</button></section>
@@ -527,6 +529,7 @@ function renderSeasonEditor() {
   editor.querySelector("[data-cancel-season]")?.addEventListener("click", cancelSeasonChanges);
   editor.querySelector("[data-save-season]")?.addEventListener("click", saveSeasonChanges);
   editor.querySelector("[data-delete-season]")?.addEventListener("click", deleteSeasonDraft);
+  editor.querySelector("[data-activate-season]")?.addEventListener("click", activateSeasonDraft);
   editor.querySelectorAll("[data-draw-season]").forEach((button) =>
     button.addEventListener("click", () => previewSeasonDraw(button.dataset.drawSeason)),
   );
@@ -629,11 +632,9 @@ function requestSeasonScheduleStart(division, details) {
   modal.querySelector("[data-confirm]").addEventListener("click", () => {
     const firstDate = parseSeasonDate(dateInput.value);
     if (!firstDate || ![2, 4].includes(firstDate.getDay())) {
-      dateInput.setCustomValidity("Escolha uma terça-feira ou quinta-feira.");
-      dateInput.reportValidity();
+      showSeasonStartDateError(modal, dateInput);
       return;
     }
-    dateInput.setCustomValidity("");
     if (!timeInput.value) {
       timeInput.reportValidity();
       return;
@@ -647,6 +648,24 @@ function requestSeasonScheduleStart(division, details) {
     details.open = true;
     updateSeasonScheduleInputs(division);
     getPage()?.querySelector("[data-season-editor]")?.classList.add("is-dirty");
+  });
+}
+
+function showSeasonStartDateError(startModal, dateInput) {
+  startModal.style.display = "none";
+  const errorModal = document.createElement("div");
+  errorModal.className = "admin-modal-backdrop";
+  errorModal.innerHTML = `<div class="admin-modal" role="alertdialog" aria-modal="true">
+    <i class="bi bi-exclamation-triangle"></i>
+    <h2>Data inicial inválida</h2>
+    <p>A primeira rodada deve começar em uma terça-feira ou quinta-feira.</p>
+    <button class="btn" type="button">Entendi</button>
+  </div>`;
+  document.body.appendChild(errorModal);
+  errorModal.querySelector("button").addEventListener("click", () => {
+    errorModal.remove();
+    startModal.style.display = "";
+    dateInput.focus();
   });
 }
 
@@ -970,6 +989,52 @@ async function deleteSeasonDraft() {
     showAdminModal("Temporada excluída", "A preparação e seus vínculos foram removidos.", "success");
   } catch (error) {
     showAdminModal("Não foi possível excluir", error.message, "error");
+  }
+}
+
+async function activateSeasonDraft() {
+  if (isSeasonDirty()) {
+    showAdminModal(
+      "Existem alterações não salvas",
+      "Salve ou cancele as alterações antes de ativar esta temporada.",
+      "error",
+    );
+    return;
+  }
+  const confirmed = await confirmAdminChange(
+    "Ativar nova temporada?",
+    `A temporada ${seasonDraft.temporada} substituirá a temporada atual. Participantes, rodadas e jogadores ativos serão atualizados. Esta ação não poderá ser desfeita.`,
+  );
+  if (!confirmed) return;
+
+  const button = getPage()?.querySelector("[data-activate-season]");
+  if (button) {
+    button.disabled = true;
+    button.innerHTML = '<span class="loading-spinner loading-spinner-inline" aria-hidden="true"></span> Ativando...';
+  }
+  try {
+    const temporada = seasonDraft.temporada;
+    const activation = await activateAdminTemporada(activeAdminSession.token, temporada);
+    setKnownCurrentSeason(activation.temporada_atual || temporada);
+    temporaryActivePlayers = new Map();
+    closeSeasonEditor();
+    const page = getPage();
+    if (page) {
+      page.querySelector("[data-admin-participants]").dataset.loaded = "";
+      page.querySelector("[data-admin-players]").dataset.loaded = "";
+    }
+    await loadAdminSeasons();
+    showAdminModal(
+      "Temporada ativada",
+      `A temporada ${temporada} agora é a temporada atual do campeonato.`,
+      "success",
+    );
+  } catch (error) {
+    showAdminModal("Não foi possível ativar", error.message, "error");
+    if (button?.isConnected) {
+      button.disabled = false;
+      button.textContent = "Ativar temporada";
+    }
   }
 }
 

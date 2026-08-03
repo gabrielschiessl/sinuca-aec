@@ -3,6 +3,7 @@ import { renderSerieA } from "./pages/serieA.js";
 import { renderSerieB } from "./pages/serieB.js";
 import { renderAdministrador } from "./pages/administrador.js";
 import { renderRegulamento } from "./pages/regulamento.js";
+import { renderHistorico } from "./pages/historico.js";
 import { withBasePath, withoutBasePath } from "./config.js";
 
 const routes = {
@@ -11,6 +12,7 @@ const routes = {
   "/serie-b": renderSerieB,
   "/administrador": renderAdministrador,
   "/regulamento": renderRegulamento,
+  "/historico": renderHistorico,
 };
 
 export function router() {

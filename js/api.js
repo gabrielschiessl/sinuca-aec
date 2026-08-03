@@ -1,5 +1,7 @@
 const API_URL =
-  "https://script.google.com/macros/s/AKfycbzQEJ5hbg5DjhhYRmakCJuC3DO16uwYP6lP0D5zYhKbuAIe4471Zfs6DiytrL2looie/exec";
+  "https://script.google.com/macros/s/AKfycbzQEJ5hbg5DjhhYRmakCJuC3DO16uwYP6lP0D5zYhKbuAIe4471Zfs6DiytrL2looie/exec"; //original
+  // "https://script.google.com/macros/s/AKfycbwrXgGHzNFPg8dkRSohBQ_zzuY_fm1PAjChEWtQZLcvTGjHg2fdEljBNaO_a746Df4i/exec"; //testes
+
 
 const CACHE_TTL = 60_000;
 const cache = new Map();
@@ -78,10 +80,11 @@ async function requestCached(key, requestData) {
  * Rodadas
  ************************************************/
 
-export async function getRodadas(divisao) {
-  return requestCached(`rodadas:${divisao}`, () =>
+export async function getRodadas(divisao, temporada = "") {
+  return requestCached(`rodadas:${divisao}:${temporada}`, () =>
     request("rodadas", {
       serie: divisao,
+      ...(temporada ? { temporada } : {}),
     }),
   );
 }
@@ -90,12 +93,17 @@ export async function getRodadas(divisao) {
  * Estatísticas
  ************************************************/
 
-export async function getEstatisticas(divisao) {
-  return requestCached(`estatisticas:${divisao}`, () =>
+export async function getEstatisticas(divisao, temporada = "") {
+  return requestCached(`estatisticas:${divisao}:${temporada}`, () =>
     request("estatisticas", {
       serie: divisao,
+      ...(temporada ? { temporada } : {}),
     }),
   );
+}
+
+export async function getTemporadas() {
+  return requestCached("temporadas", () => request("temporadas"));
 }
 
 /************************************************
@@ -167,6 +175,13 @@ export function saveAdminTemporada(token, temporada, participantes, rodadas) {
 
 export function deleteAdminTemporada(token, temporada) {
   return post({ acao: "excluir_temporada", token, temporada }).then((result) => {
+    cache.clear();
+    return result;
+  });
+}
+
+export function activateAdminTemporada(token, temporada) {
+  return post({ acao: "ativar_temporada", token, temporada }).then((result) => {
     cache.clear();
     return result;
   });

@@ -37,7 +37,7 @@ function getTemporadasAdmin() {
           temporada,
           versao,
           status: String(registro.status).trim().toUpperCase(),
-          tipo: registro.tipo || "NOVA",
+          tipo: normalizarTipoTemporada(registro.tipo),
           criado_em: registro.criado_em,
           atualizado_em: registro.atualizado_em,
           participantes_a: vinculados.filter((item) => String(item.divisao).trim().toUpperCase() === "A").length,
@@ -70,6 +70,17 @@ function prepararNovaTemporada(temporadaInformada) {
     A: montarSugestaoParticipantes(serieA, "A"),
     B: montarSugestaoParticipantes(serieB, "B"),
   };
+  const rodadas = gerarChaveamentoTemporada(participantes);
+  rodadas.A = copiarChaveamentoAtualDivisao("A", participantes.A.length);
+  const temporadaAtual = getTemporadaAtual();
+  const totalAtualSerieB = getSheetAsObjects(SHEETS.participantes)
+    .filter((participante) =>
+      Number(participante.temporada) === temporadaAtual &&
+      String(participante.divisao).trim().toUpperCase() === "B",
+    ).length;
+  if (participantes.B.length === totalAtualSerieB) {
+    rodadas.B = copiarChaveamentoAtualDivisao("B", participantes.B.length);
+  }
 
   return {
     persistida: false,
@@ -77,7 +88,7 @@ function prepararNovaTemporada(temporadaInformada) {
     versao: 1,
     status: TEMPORADA_STATUS.PREPARACAO,
     participantes,
-    rodadas: gerarChaveamentoTemporada(participantes),
+    rodadas,
     jogadores: getJogadores().sort((a, b) => a.exibicao.localeCompare(b.exibicao, "pt-BR")),
   };
 }
@@ -164,7 +175,7 @@ function salvarTemporadaPreparacao(dados) {
         temporada,
         versao,
         TEMPORADA_STATUS.PREPARACAO,
-        "NOVA",
+        "CRIADA",
         agora,
         agora,
       ]);
@@ -255,7 +266,11 @@ function excluirTemporadaPreparacao(temporadaInformada) {
       temporada,
       versao,
     );
-    abaTemporadas.deleteRow(indice + 1);
+    excluirLinhasPorTemporadaVersao(
+      abaTemporadas,
+      temporada,
+      versao,
+    );
     delete CACHE[SHEETS.temporadas];
     delete CACHE[SHEETS.temporadasParticipantes];
     delete CACHE[SHEETS.temporadasRodadas];
@@ -263,6 +278,243 @@ function excluirTemporadaPreparacao(temporadaInformada) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function ativarTemporadaPreparacao(temporadaInformada) {
+  garantirEstruturaTemporadas();
+  const temporada = Number(temporadaInformada);
+  const temporadaAtual = getTemporadaAtual();
+  if (!Number.isInteger(temporada) || temporada !== temporadaAtual + 1) {
+    throw new Error(`Somente a temporada ${temporadaAtual + 1} pode substituir a temporada atual.`);
+  }
+
+  const registro = getSheetAsObjects(SHEETS.temporadas).find(
+    (item) =>
+      Number(item.temporada) === temporada &&
+      String(item.status).trim().toUpperCase() === TEMPORADA_STATUS.PREPARACAO,
+  );
+  if (!registro) throw new Error("Temporada em preparação não encontrada.");
+
+  const versao = Number(registro.versao) || 1;
+  const participantesPreparados = getSheetAsObjects(SHEETS.temporadasParticipantes)
+    .filter((item) =>
+      Number(item.temporada) === temporada &&
+      (Number(item.versao) || 1) === versao,
+    );
+  const participantes = validarParticipantesTemporada({
+    A: participantesPreparados
+      .filter((item) => String(item.divisao).trim().toUpperCase() === "A")
+      .sort((a, b) => Number(a.numero) - Number(b.numero)),
+    B: participantesPreparados
+      .filter((item) => String(item.divisao).trim().toUpperCase() === "B")
+      .sort((a, b) => Number(a.numero) - Number(b.numero)),
+  });
+  const partidasPreparadas = getSheetAsObjects(SHEETS.temporadasRodadas)
+    .filter((item) =>
+      Number(item.temporada) === temporada &&
+      (Number(item.versao) || 1) === versao,
+    )
+    .map(normalizarRodadaTemporada);
+  const rodadas = validarRodadasTemporadaInformadas(
+    agruparChaveamentoTemporada(partidasPreparadas),
+    participantes,
+  );
+  validarAgendaPublicacaoTemporada(rodadas);
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const agora = new Date();
+    const abaParticipantes = planilha.getSheetByName(SHEETS.participantes);
+    const abaRodadas = planilha.getSheetByName(SHEETS.rodadas);
+
+    excluirLinhasPorTemporada(abaParticipantes, temporada);
+    excluirLinhasPorTemporada(abaRodadas, temporada);
+    adicionarObjetosAba(
+      abaParticipantes,
+      ["A", "B"].flatMap((divisao) =>
+        participantes[divisao].map((participante, indice) => ({
+          temporada,
+          divisao,
+          numero: indice + 1,
+          jogador_id: participante.jogador_id,
+        })),
+      ),
+    );
+    adicionarObjetosAba(
+      abaRodadas,
+      ["A", "B"].flatMap((divisao) =>
+        rodadas[divisao].flatMap((rodada) =>
+          rodada.partidas.map((partida) => ({
+            temporada,
+            divisao,
+            rodada: rodada.rodada,
+            numero1: partida.numero1,
+            numero2: partida.numero2,
+            data: formatarDataPublicadaTemporada(partida.data),
+            hora: partida.hora,
+            status: "A",
+            placar1: "-",
+            placar2: "-",
+            observacao: "",
+            atualizado_em: agora,
+          })),
+        ),
+      ),
+    );
+
+    sincronizarAtividadeJogadoresTemporada(
+      planilha,
+      new Set(
+        [...participantes.A, ...participantes.B]
+          .map((item) => Number(item.jogador_id)),
+      ),
+    );
+    atualizarStatusTemporadasAtivacao(
+      planilha.getSheetByName(SHEETS.temporadas),
+      temporadaAtual,
+      temporada,
+      agora,
+    );
+    atualizarTemporadaAtualConfiguracao(
+      planilha.getSheetByName(SHEETS.configuracao),
+      temporada,
+    );
+
+    excluirLinhasPorTemporadaVersao(
+      planilha.getSheetByName(SHEETS.temporadasParticipantes),
+      temporada,
+      versao,
+    );
+    excluirLinhasPorTemporadaVersao(
+      planilha.getSheetByName(SHEETS.temporadasRodadas),
+      temporada,
+      versao,
+    );
+    Object.keys(CACHE).forEach((chave) => { delete CACHE[chave]; });
+    return { sucesso: true, temporada_atual: temporada };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function validarAgendaPublicacaoTemporada(rodadas) {
+  ["A", "B"].forEach((divisao) => {
+    rodadas[divisao].forEach((rodada) => {
+      rodada.partidas.forEach((partida) => {
+        const data = parseDataTemporada(partida.data);
+        if (!data || !partida.hora) {
+          throw new Error(`Preencha a data e o horário de todas as partidas da Série ${divisao}.`);
+        }
+        if (![2, 4].includes(data.getDay())) {
+          throw new Error(`As partidas da Série ${divisao} devem ocorrer às terças ou quintas-feiras.`);
+        }
+      });
+    });
+  });
+}
+
+function parseDataTemporada(valor) {
+  const partes = String(valor || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!partes) return null;
+  const data = new Date(Number(partes[1]), Number(partes[2]) - 1, Number(partes[3]), 12);
+  if (
+    Number.isNaN(data.getTime()) ||
+    data.getFullYear() !== Number(partes[1]) ||
+    data.getMonth() !== Number(partes[2]) - 1 ||
+    data.getDate() !== Number(partes[3])
+  ) return null;
+  return data;
+}
+
+function formatarDataPublicadaTemporada(valor) {
+  const partes = String(valor || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return partes ? `${partes[3]}/${partes[2]}/${partes[1]}` : valor;
+}
+
+function adicionarObjetosAba(aba, objetos) {
+  if (!objetos.length) return;
+  const ultimaColuna = aba.getLastColumn();
+  const cabecalhos = aba.getRange(1, 1, 1, ultimaColuna).getDisplayValues()[0]
+    .map((valor) => String(valor).trim().toLowerCase());
+  const linhas = objetos.map((objeto) =>
+    cabecalhos.map((cabecalho) =>
+      Object.prototype.hasOwnProperty.call(objeto, cabecalho) ? objeto[cabecalho] : "",
+    ),
+  );
+  aba.getRange(aba.getLastRow() + 1, 1, linhas.length, ultimaColuna).setValues(linhas);
+}
+
+function excluirLinhasPorTemporada(aba, temporada) {
+  const ultimaLinha = aba.getLastRow();
+  const ultimaColuna = aba.getLastColumn();
+  if (ultimaLinha <= 1 || ultimaColuna < 1) return;
+  const cabecalhos = aba.getRange(1, 1, 1, ultimaColuna).getDisplayValues()[0]
+    .map((valor) => String(valor).trim().toLowerCase());
+  const colunaTemporada = cabecalhos.indexOf("temporada");
+  if (colunaTemporada < 0) throw new Error("A aba não possui a coluna temporada.");
+  const intervalo = aba.getRange(2, 1, ultimaLinha - 1, ultimaColuna);
+  const restantes = intervalo.getValues()
+    .filter((linha) => Number(linha[colunaTemporada]) !== Number(temporada));
+  intervalo.clearContent();
+  if (restantes.length) {
+    aba.getRange(2, 1, restantes.length, ultimaColuna).setValues(restantes);
+  }
+}
+
+function sincronizarAtividadeJogadoresTemporada(planilha, idsAtivos) {
+  const aba = planilha.getSheetByName(SHEETS.jogadores);
+  const valores = aba.getDataRange().getValues();
+  const cabecalhos = valores[0].map((valor) => String(valor).trim().toLowerCase());
+  const colunaId = cabecalhos.indexOf("id");
+  const colunaAtivo = cabecalhos.indexOf("ativo");
+  if (colunaId < 0 || colunaAtivo < 0) {
+    throw new Error("A estrutura da aba Jogadores está incompleta.");
+  }
+  const atividade = valores.slice(1).map((linha) => [
+    idsAtivos.has(Number(linha[colunaId])) ? "S" : "N",
+  ]);
+  if (atividade.length) {
+    aba.getRange(2, colunaAtivo + 1, atividade.length, 1).setValues(atividade);
+  }
+}
+
+function atualizarStatusTemporadasAtivacao(aba, temporadaAtual, novaTemporada, agora) {
+  const valores = aba.getDataRange().getValues();
+  const cabecalhos = valores[0].map((valor) => String(valor).trim().toLowerCase());
+  const colunaTemporada = cabecalhos.indexOf("temporada");
+  const colunaStatus = cabecalhos.indexOf("status");
+  const colunaAtualizado = cabecalhos.indexOf("atualizado_em");
+  const linhaAtual = valores.findIndex((linha, indice) =>
+    indice > 0 && Number(linha[colunaTemporada]) === Number(temporadaAtual),
+  );
+  const linhaNova = valores.findIndex((linha, indice) =>
+    indice > 0 && Number(linha[colunaTemporada]) === Number(novaTemporada),
+  );
+  if (linhaAtual < 1 || linhaNova < 1 || colunaStatus < 0) {
+    throw new Error("Não foi possível atualizar o status das temporadas.");
+  }
+  aba.getRange(linhaAtual + 1, colunaStatus + 1).setValue(TEMPORADA_STATUS.ARQUIVADA);
+  aba.getRange(linhaNova + 1, colunaStatus + 1).setValue(TEMPORADA_STATUS.ATIVA);
+  if (colunaAtualizado >= 0) {
+    aba.getRange(linhaAtual + 1, colunaAtualizado + 1).setValue(agora);
+    aba.getRange(linhaNova + 1, colunaAtualizado + 1).setValue(agora);
+  }
+}
+
+function atualizarTemporadaAtualConfiguracao(aba, temporada) {
+  const valores = aba.getDataRange().getValues();
+  const cabecalhos = valores[0].map((valor) => String(valor).trim().toLowerCase());
+  const colunaChave = cabecalhos.indexOf("chave");
+  const colunaValor = cabecalhos.indexOf("valor");
+  const indice = valores.findIndex((linha, linhaIndice) =>
+    linhaIndice > 0 && String(linha[colunaChave]).trim() === "temporada_atual",
+  );
+  if (indice < 1 || colunaValor < 0) {
+    throw new Error("A configuração temporada_atual não foi encontrada.");
+  }
+  aba.getRange(indice + 1, colunaValor + 1).setValue(temporada);
 }
 
 function garantirEstruturaTemporadas() {
@@ -300,6 +552,7 @@ function garantirEstruturaTemporadas() {
   );
 
   const temporadaAtual = getTemporadaAtual();
+  normalizarTiposTemporadas(abaTemporadas);
   const existeAtual = abaTemporadas.getDataRange().getDisplayValues().slice(1)
     .some((linha) => Number(linha[0]) === temporadaAtual);
   if (!existeAtual) {
@@ -308,10 +561,33 @@ function garantirEstruturaTemporadas() {
       temporadaAtual,
       1,
       TEMPORADA_STATUS.ATIVA,
-      "ATUAL",
+      "LEGADA",
       agora,
       agora,
     ]);
+    delete CACHE[SHEETS.temporadas];
+  }
+}
+
+function normalizarTipoTemporada(valor) {
+  const tipo = String(valor || "").trim().toUpperCase();
+  if (tipo === "ATUAL" || tipo === "LEGADA") return "LEGADA";
+  return "CRIADA";
+}
+
+function normalizarTiposTemporadas(aba) {
+  const ultimaLinha = aba.getLastRow();
+  if (ultimaLinha <= 1) return;
+  const cabecalhos = aba.getRange(1, 1, 1, aba.getLastColumn())
+    .getDisplayValues()[0]
+    .map((valor) => String(valor).trim().toLowerCase());
+  const colunaTipo = cabecalhos.indexOf("tipo");
+  if (colunaTipo < 0) return;
+  const intervalo = aba.getRange(2, colunaTipo + 1, ultimaLinha - 1, 1);
+  const atuais = intervalo.getDisplayValues();
+  const normalizados = atuais.map(([tipo]) => [normalizarTipoTemporada(tipo)]);
+  if (atuais.some(([tipo], indice) => tipo !== normalizados[indice][0])) {
+    intervalo.setValues(normalizados);
     delete CACHE[SHEETS.temporadas];
   }
 }
@@ -408,6 +684,53 @@ function gerarChaveamentoTemporada(participantes) {
     validarChaveamentoTodosContraTodos(resultado[divisao], numeros, divisao);
   });
   return resultado;
+}
+
+function copiarChaveamentoAtualDivisao(divisaoInformada, totalParticipantes) {
+  const divisao = String(divisaoInformada).trim().toUpperCase();
+  const temporadaAtual = getTemporadaAtual();
+  const totalRodadas = totalParticipantes % 2 === 0
+    ? totalParticipantes - 1
+    : totalParticipantes;
+  const partidasAtuais = getSheetAsObjects(SHEETS.rodadas)
+    .filter((partida) =>
+      Number(partida.temporada) === temporadaAtual &&
+      String(partida.divisao).trim().toUpperCase() === divisao &&
+      Number(partida.rodada) >= 1 &&
+      Number(partida.rodada) <= totalRodadas,
+    );
+  const mapa = {};
+
+  partidasAtuais.forEach((partida) => {
+    const rodada = Number(partida.rodada);
+    if (!mapa[rodada]) {
+      mapa[rodada] = {
+        rodada,
+        tipo: "REGULAR",
+        folga: null,
+        partidas: [],
+      };
+    }
+    mapa[rodada].partidas.push({
+      numero1: Number(partida.numero1),
+      numero2: Number(partida.numero2),
+      data: "",
+      hora: "19:00",
+    });
+  });
+
+  const rodadas = Object.values(mapa).sort((a, b) => a.rodada - b.rodada);
+  const numeros = Array.from({ length: totalParticipantes }, (_, indice) => indice + 1);
+  if (divisao === "B" && totalParticipantes % 2 === 1) {
+    rodadas.forEach((rodada) => {
+      const usados = new Set(
+        rodada.partidas.flatMap((partida) => [partida.numero1, partida.numero2]),
+      );
+      rodada.folga = numeros.find((numero) => !usados.has(numero)) || null;
+    });
+  }
+  validarChaveamentoTodosContraTodos(rodadas, numeros, divisao);
+  return rodadas;
 }
 
 function gerarRodadasTodosContraTodos(numerosInformados) {
@@ -626,10 +949,21 @@ function corrigirFolgasChaveamentoCarregado(rodadas, participantes) {
 }
 
 function excluirLinhasPorTemporadaVersao(aba, temporada, versao) {
-  const valores = aba.getDataRange().getDisplayValues();
-  for (let indice = valores.length - 1; indice >= 1; indice -= 1) {
-    if (Number(valores[indice][0]) === temporada && (Number(valores[indice][1]) || 1) === versao) {
-      aba.deleteRow(indice + 1);
-    }
+  const ultimaLinha = aba.getLastRow();
+  const ultimaColuna = aba.getLastColumn();
+  if (ultimaLinha <= 1 || ultimaColuna < 1) return;
+
+  const intervalo = aba.getRange(2, 1, ultimaLinha - 1, ultimaColuna);
+  const valores = intervalo.getValues();
+  const restantes = valores.filter((linha) =>
+    !(
+      Number(linha[0]) === Number(temporada) &&
+      (Number(linha[1]) || 1) === Number(versao)
+    ),
+  );
+
+  intervalo.clearContent();
+  if (restantes.length) {
+    aba.getRange(2, 1, restantes.length, ultimaColuna).setValues(restantes);
   }
 }

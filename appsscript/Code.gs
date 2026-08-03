@@ -18,10 +18,13 @@ function doGet(e) {
       return responder(getJogadores());
 
     case "rodadas":
-      return responder(getRodadas(e.parameter.serie || "A"));
+      return responder(getRodadas(e.parameter.serie || "A", e.parameter.temporada));
 
     case "estatisticas":
-      return responder(getEstatisticas(e.parameter.serie || "A"));
+      return responder(getEstatisticas(e.parameter.serie || "A", e.parameter.temporada));
+
+    case "temporadas":
+      return responder(getTemporadasPublicas());
 
     default:
       return responder({
@@ -81,6 +84,10 @@ function doPost(e) {
       case "excluir_temporada":
         validarSessaoAdmin(dados.token);
         return responder(excluirTemporadaPreparacao(dados.temporada));
+
+      case "ativar_temporada":
+        validarSessaoAdmin(dados.token);
+        return responder(ativarTemporadaPreparacao(dados.temporada));
 
       case "salvar_partida":
         validarSessaoAdmin(dados.token);
