@@ -27,10 +27,21 @@ export function navigate(path) {
   window.history.pushState({}, "", withBasePath(path));
 
   router();
+  resetPageScroll();
 }
 
 // permite voltar/avançar do navegador
-window.addEventListener("popstate", router);
+window.addEventListener("popstate", () => {
+  router();
+  resetPageScroll();
+});
+
+export function resetPageScroll() {
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  requestAnimationFrame(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  });
+}
 
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-route]");
