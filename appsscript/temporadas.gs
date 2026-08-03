@@ -197,8 +197,8 @@ function salvarTemporadaPreparacao(dados) {
           "REGULAR",
           partida.numero1,
           partida.numero2,
-          "",
-          "",
+          partida.data || "",
+          partida.hora || "",
           "A",
           "-",
           "-",
@@ -429,7 +429,12 @@ function gerarRodadasTodosContraTodos(numerosInformados) {
         numero1 = numero2;
         numero2 = temporario;
       }
-      partidas.push({ numero1, numero2 });
+      partidas.push({
+        numero1,
+        numero2,
+        data: "",
+        hora: "19:00",
+      });
     }
     const usados = new Set(
       partidas.flatMap((partida) => [partida.numero1, partida.numero2]),
@@ -520,16 +525,30 @@ function validarRodadasTemporadaInformadas(valor, participantes) {
       tipo: "REGULAR",
       folga: Number(rodada.folga) || null,
       partidas: (Array.isArray(rodada.partidas) ? rodada.partidas : []).map(
-        (partida) => ({
-          numero1: Number(partida.numero1),
-          numero2: Number(partida.numero2),
-        }),
+        normalizarPartidaPreparacao,
       ),
     }));
     const numeros = participantes[divisao].map((_, indice) => indice + 1);
     validarChaveamentoTodosContraTodos(resultado[divisao], numeros, divisao);
   });
   return resultado;
+}
+
+function normalizarPartidaPreparacao(partida) {
+  const data = String(partida.data || "").trim();
+  const hora = String(partida.hora || "19:00").trim();
+  if (data && !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+    throw new Error("Uma das partidas possui uma data inválida.");
+  }
+  if (hora && !/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) {
+    throw new Error("Uma das partidas possui um horário inválido.");
+  }
+  return {
+    numero1: Number(partida.numero1),
+    numero2: Number(partida.numero2),
+    data,
+    hora,
+  };
 }
 
 function normalizarRodadaTemporada(item) {
@@ -539,11 +558,27 @@ function normalizarRodadaTemporada(item) {
     tipo: item.tipo || "REGULAR",
     numero1: Number(item.numero1),
     numero2: Number(item.numero2),
-    data: item.data || "",
-    hora: item.hora || "",
+    data: normalizarDataPreparacaoLida(item.data),
+    hora: normalizarHoraPreparacaoLida(item.hora) || "19:00",
     status: item.status || "A",
     folga: Number(item.folga) || null,
   };
+}
+
+function normalizarDataPreparacaoLida(valor) {
+  const texto = String(valor || "").trim();
+  if (!texto) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) return texto;
+  const brasileira = texto.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return brasileira
+    ? `${brasileira[3]}-${brasileira[2]}-${brasileira[1]}`
+    : "";
+}
+
+function normalizarHoraPreparacaoLida(valor) {
+  const texto = String(valor || "").trim();
+  const correspondencia = texto.match(/^(\d{2}):(\d{2})/);
+  return correspondencia ? `${correspondencia[1]}:${correspondencia[2]}` : "";
 }
 
 function agruparChaveamentoTemporada(partidas) {

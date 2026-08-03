@@ -399,7 +399,7 @@ function toggleAdminEditMode(event) {
   dashboard.querySelector("[data-add-player]").disabled = !adminEditMode;
   const createSeasonButton = dashboard.querySelector("[data-create-season]");
   if (createSeasonButton) createSeasonButton.disabled = Boolean(seasonDraft);
-  dashboard.querySelectorAll("[data-season-editor] select, [data-season-editor] button").forEach((field) => {
+  dashboard.querySelectorAll("[data-season-editor] select, [data-season-editor] input, [data-season-editor] button").forEach((field) => {
     field.disabled = !adminEditMode;
   });
   dashboard.querySelectorAll("[data-player-row]").forEach((row) => {
@@ -530,6 +530,16 @@ function renderSeasonEditor() {
   editor.querySelectorAll("[data-draw-season]").forEach((button) =>
     button.addEventListener("click", () => previewSeasonDraw(button.dataset.drawSeason)),
   );
+  editor.querySelectorAll("[data-season-schedule-details]").forEach((details) =>
+    details.addEventListener("toggle", handleSeasonScheduleOpen),
+  );
+  editor.querySelectorAll("[data-season-schedule-field]").forEach((input) =>
+    input.addEventListener("change", updateSeasonScheduleField),
+  );
+  editor.querySelectorAll("[data-season-round-field]").forEach((input) =>
+    input.addEventListener("change", updateSeasonRoundField),
+  );
+  enableSeasonSchedulePickers(editor);
   page.querySelector("[data-create-season]").disabled = true;
 }
 
@@ -554,14 +564,203 @@ function renderSeasonSchedulePreview() {
     const totalMatches = rounds.reduce((total, round) => total + round.partidas.length, 0);
     return `<div class="admin-season-schedule-wrap">
       <button class="btn btn-admin-secondary admin-season-draw" type="button" data-draw-season="${division}" ${adminEditMode ? "" : "disabled"}><i class="bi bi-shuffle"></i> Simular sorteio da Série ${division}</button>
-      <details class="admin-season-schedule">
+      <details class="admin-season-schedule" data-season-schedule-details data-division="${division}">
       <summary><span><strong>Chaveamento da Série ${division}</strong><small>${rounds.length} rodadas · ${totalMatches} partidas</small></span><i class="bi bi-chevron-down"></i></summary>
-      <div class="admin-season-round-list">${rounds.map((round) => `
-        <section><h4>Rodada ${round.rodada}</h4>${round.partidas.map((match) => `<p><span>${escapeHtml(playerName(division, match.numero1))}</span><b>×</b><span>${escapeHtml(playerName(division, match.numero2))}</span></p>`).join("")}${round.folga ? `<small class="admin-season-bye"><i class="bi bi-pause-circle"></i> Folga: ${escapeHtml(playerName(division, round.folga))}</small>` : ""}</section>`).join("")}</div>
+      <div class="admin-season-round-list">${rounds.map((round) => renderSeasonRoundSchedule(division, round, playerName)).join("")}</div>
       </details>
     </div>`;
   };
   return `<div class="admin-season-schedules"><h3>Prévia do chaveamento</h3><p>Cada participante enfrenta todos os demais uma única vez.</p>${divisionPreview("A")}${divisionPreview("B")}</div>`;
+}
+
+function renderSeasonRoundSchedule(division, round, playerName) {
+  const commonDate = getCommonSeasonRoundValue(round, "data");
+  const commonTime = getCommonSeasonRoundValue(round, "hora");
+  return `<section data-season-round-preview data-division="${division}" data-round-index="${round.rodada - 1}">
+    <h4>Rodada ${round.rodada}</h4>
+    <div class="admin-season-round-schedule">
+      <label><span>Data da rodada</span><input class="admin-input" type="date" value="${escapeHtml(commonDate)}" data-season-round-field="data" data-division="${division}" data-round-index="${round.rodada - 1}" ${adminEditMode ? "" : "disabled"}></label>
+      <label><span>Horário da rodada</span><input class="admin-input" type="time" value="${escapeHtml(commonTime)}" data-season-round-field="hora" data-division="${division}" data-round-index="${round.rodada - 1}" ${adminEditMode ? "" : "disabled"}></label>
+    </div>
+    ${round.partidas.map((match, matchIndex) => `<div class="admin-season-match-preview"><p><span>${escapeHtml(playerName(division, match.numero1))}</span><b>×</b><span>${escapeHtml(playerName(division, match.numero2))}</span></p><div class="admin-season-match-schedule"><label><span>Data</span><input class="admin-input" type="date" value="${escapeHtml(match.data || "")}" data-season-schedule-field="data" data-division="${division}" data-round-index="${round.rodada - 1}" data-match-index="${matchIndex}" ${adminEditMode ? "" : "disabled"}></label><label><span>Horário</span><input class="admin-input" type="time" value="${escapeHtml(match.hora || "19:00")}" data-season-schedule-field="hora" data-division="${division}" data-round-index="${round.rodada - 1}" data-match-index="${matchIndex}" ${adminEditMode ? "" : "disabled"}></label></div></div>`).join("")}
+    ${round.folga ? `<small class="admin-season-bye"><i class="bi bi-pause-circle"></i> Folga: ${escapeHtml(playerName(division, round.folga))}</small>` : ""}
+  </section>`;
+}
+
+function getCommonSeasonRoundValue(round, field) {
+  const values = [...new Set(round.partidas.map((match) => match[field] || (field === "hora" ? "19:00" : "")))];
+  return values.length === 1 ? values[0] : "";
+}
+
+function handleSeasonScheduleOpen(event) {
+  const details = event.currentTarget;
+  if (!details.open || !adminEditMode) return;
+  const division = details.dataset.division;
+  const firstRound = seasonDraft.rodadas?.[division]?.[0];
+  if (!firstRound || getCommonSeasonRoundValue(firstRound, "data")) return;
+  details.open = false;
+  requestSeasonScheduleStart(division, details);
+}
+
+function requestSeasonScheduleStart(division, details) {
+  document.querySelector(".admin-modal-backdrop")?.remove();
+  const firstRound = seasonDraft.rodadas?.[division]?.[0];
+  const initialTime = firstRound
+    ? getCommonSeasonRoundValue(firstRound, "hora") || "19:00"
+    : "19:00";
+  const modal = document.createElement("div");
+  modal.className = "admin-modal-backdrop";
+  modal.innerHTML = `<div class="admin-modal admin-season-start-modal" role="dialog" aria-modal="true">
+    <i class="bi bi-calendar2-week"></i>
+    <h2>Início da Série ${division}</h2>
+    <p>Informe a data e o horário da primeira rodada. As próximas datas serão distribuídas automaticamente entre terças e quintas.</p>
+    <div class="admin-season-start-fields">
+      <label><span>Data de início</span><input class="admin-input" type="date" data-season-start-date required></label>
+      <label><span>Horário</span><input class="admin-input" type="time" value="${escapeHtml(initialTime)}" data-season-start-time required></label>
+    </div>
+    <div class="admin-modal-actions"><button class="btn btn-admin-secondary" type="button" data-cancel>Cancelar</button><button class="btn" type="button" data-confirm>Confirmar</button></div>
+  </div>`;
+  document.body.appendChild(modal);
+  enableSeasonSchedulePickers(modal);
+  const dateInput = modal.querySelector("[data-season-start-date]");
+  const timeInput = modal.querySelector("[data-season-start-time]");
+  dateInput.focus();
+  modal.querySelector("[data-cancel]").addEventListener("click", () => modal.remove());
+  modal.querySelector("[data-confirm]").addEventListener("click", () => {
+    const firstDate = parseSeasonDate(dateInput.value);
+    if (!firstDate || ![2, 4].includes(firstDate.getDay())) {
+      dateInput.setCustomValidity("Escolha uma terça-feira ou quinta-feira.");
+      dateInput.reportValidity();
+      return;
+    }
+    dateInput.setCustomValidity("");
+    if (!timeInput.value) {
+      timeInput.reportValidity();
+      return;
+    }
+    seasonDraft.rodadas = getEffectiveSeasonSchedules();
+    fillSeasonTuesdayThursdayCalendar(division, firstDate);
+    seasonDraft.rodadas[division][0].partidas.forEach((match) => {
+      match.hora = timeInput.value;
+    });
+    modal.remove();
+    details.open = true;
+    updateSeasonScheduleInputs(division);
+    getPage()?.querySelector("[data-season-editor]")?.classList.add("is-dirty");
+  });
+}
+
+function updateSeasonScheduleField(event) {
+  const input = event.currentTarget;
+  seasonDraft.rodadas = getEffectiveSeasonSchedules();
+  const match = seasonDraft.rodadas[input.dataset.division]
+    ?.[Number(input.dataset.roundIndex)]
+    ?.partidas[Number(input.dataset.matchIndex)];
+  if (!match) return;
+  match[input.dataset.seasonScheduleField] = input.value;
+  updateSeasonRoundControls(input.dataset.division, Number(input.dataset.roundIndex));
+  getPage()?.querySelector("[data-season-editor]")?.classList.toggle("is-dirty", isSeasonDirty());
+}
+
+function updateSeasonRoundField(event) {
+  const input = event.currentTarget;
+  const division = input.dataset.division;
+  const roundIndex = Number(input.dataset.roundIndex);
+  const field = input.dataset.seasonRoundField;
+  seasonDraft.rodadas = getEffectiveSeasonSchedules();
+  const rounds = seasonDraft.rodadas[division];
+  const round = rounds?.[roundIndex];
+  if (!round) return;
+
+  if (field === "data" && roundIndex === 0 && input.value) {
+    const firstDate = parseSeasonDate(input.value);
+    const weekday = firstDate?.getDay();
+    if (![2, 4].includes(weekday)) {
+      input.value = getCommonSeasonRoundValue(round, "data");
+      showAdminModal(
+        "Data inicial inválida",
+        "A primeira rodada deve começar em uma terça-feira ou quinta-feira.",
+        "error",
+      );
+      return;
+    }
+    fillSeasonTuesdayThursdayCalendar(division, firstDate);
+    updateSeasonScheduleInputs(division);
+  } else {
+    round.partidas.forEach((match) => {
+      match[field] = input.value || (field === "hora" ? "19:00" : "");
+    });
+    updateSeasonScheduleInputs(division, roundIndex);
+  }
+  getPage()?.querySelector("[data-season-editor]")?.classList.toggle("is-dirty", isSeasonDirty());
+}
+
+function fillSeasonTuesdayThursdayCalendar(division, firstDate) {
+  let date = new Date(firstDate);
+  seasonDraft.rodadas[division].forEach((round) => {
+    const formatted = formatSeasonDate(date);
+    round.partidas.forEach((match) => {
+      match.data = formatted;
+      match.hora = match.hora || "19:00";
+    });
+    date.setDate(date.getDate() + (date.getDay() === 2 ? 2 : 5));
+  });
+}
+
+function parseSeasonDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day, 12, 0, 0);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatSeasonDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function updateSeasonScheduleInputs(division, onlyRoundIndex = null) {
+  const editor = getPage()?.querySelector("[data-season-editor]");
+  if (!editor) return;
+  const rounds = seasonDraft.rodadas[division];
+  rounds.forEach((round, roundIndex) => {
+    if (onlyRoundIndex !== null && roundIndex !== onlyRoundIndex) return;
+    ["data", "hora"].forEach((field) => {
+      const roundInput = editor.querySelector(`[data-season-round-field="${field}"][data-division="${division}"][data-round-index="${roundIndex}"]`);
+      if (roundInput) roundInput.value = getCommonSeasonRoundValue(round, field);
+    });
+    round.partidas.forEach((match, matchIndex) => {
+      ["data", "hora"].forEach((field) => {
+        const matchInput = editor.querySelector(`[data-season-schedule-field="${field}"][data-division="${division}"][data-round-index="${roundIndex}"][data-match-index="${matchIndex}"]`);
+        if (matchInput) matchInput.value = match[field] || (field === "hora" ? "19:00" : "");
+      });
+    });
+  });
+}
+
+function updateSeasonRoundControls(division, roundIndex) {
+  const round = seasonDraft.rodadas[division]?.[roundIndex];
+  if (!round) return;
+  ["data", "hora"].forEach((field) => {
+    const input = getPage()?.querySelector(`[data-season-round-field="${field}"][data-division="${division}"][data-round-index="${roundIndex}"]`);
+    if (input) input.value = getCommonSeasonRoundValue(round, field);
+  });
+}
+
+function enableSeasonSchedulePickers(container) {
+  container.querySelectorAll('input[type="date"], input[type="time"]').forEach((input) => {
+    input.addEventListener("click", () => {
+      if (!input.disabled && typeof input.showPicker === "function") {
+        try {
+          input.showPicker();
+        } catch (error) {
+          // Alguns navegadores já abrem o seletor no clique nativo.
+        }
+      }
+    });
+  });
 }
 
 function buildSeasonSchedules(participants) {
@@ -590,7 +789,12 @@ function buildDivisionSchedule(orderedNumbers, standardizeByes = false) {
         let number2 = current[current.length - 1 - index];
         if (number1 === null || number2 === null) continue;
         if ((roundIndex + index) % 2 === 1) [number1, number2] = [number2, number1];
-        matches.push({ numero1: number1, numero2: number2 });
+        matches.push({
+          numero1: number1,
+          numero2: number2,
+          data: "",
+          hora: "19:00",
+        });
       }
       const used = new Set(matches.flatMap((match) => [match.numero1, match.numero2]));
       const folga = orderedNumbers.find((number) => !used.has(number)) || null;
@@ -612,6 +816,9 @@ function previewSeasonDraw(division) {
   syncSeasonDraftFromEditor();
   const numbers = seasonDraft.participantes[division].map((_, index) => index + 1);
   const currentSignature = getScheduleSignature(getEffectiveSeasonSchedules()[division]);
+  const hasScheduledMatches = getEffectiveSeasonSchedules()[division].some((round) =>
+    round.partidas.some((match) => match.data || (match.hora && match.hora !== "19:00")),
+  );
   let suggestion = null;
   for (let attempt = 0; attempt < 12; attempt += 1) {
     suggestion = buildDivisionSchedule(
@@ -625,7 +832,7 @@ function previewSeasonDraw(division) {
   modal.innerHTML = `<div class="admin-modal admin-draw-modal" role="dialog" aria-modal="true">
     <i class="bi bi-shuffle"></i>
     <h2>Sugestão para a Série ${division}</h2>
-    <p>Confira o sorteio antes de aplicá-lo ao rascunho.</p>
+    <p>Confira o sorteio antes de aplicá-lo ao rascunho.${hasScheduledMatches ? " As datas e os horários personalizados desta série serão removidos." : ""}</p>
     <div class="admin-draw-preview">${suggestion.map((round) => `
       <section><h3>Rodada ${round.rodada}</h3>${round.partidas.map((match) => `<p><span>${escapeHtml(getSeasonPlayerName(division, match.numero1))}</span><b>×</b><span>${escapeHtml(getSeasonPlayerName(division, match.numero2))}</span></p>`).join("")}${round.folga ? `<small class="admin-season-bye"><i class="bi bi-pause-circle"></i> Folga: ${escapeHtml(getSeasonPlayerName(division, round.folga))}</small>` : ""}</section>`).join("")}</div>
     <div class="admin-modal-actions"><button class="btn btn-admin-secondary" type="button" data-cancel>Cancelar</button><button class="btn" type="button" data-apply>Aplicar sugestão</button></div>
@@ -678,7 +885,12 @@ function isSeasonDirty() {
       (draft.rodadas?.[division] || []).map((round) =>
         [
           Number(round.folga) || null,
-          ...round.partidas.map((match) => [Number(match.numero1), Number(match.numero2)]),
+          ...round.partidas.map((match) => [
+            Number(match.numero1),
+            Number(match.numero2),
+            match.data || "",
+            match.hora || "",
+          ]),
         ],
       ),
     ),
