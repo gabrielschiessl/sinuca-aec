@@ -518,6 +518,7 @@ function renderSeasonEditor() {
       <section><h3>Série A <small>20 participantes</small></h3><div data-season-list="A">${rows("A")}</div></section>
       <section><h3>Série B <small>${seasonDraft.participantes.B.length} participantes</small></h3><div data-season-list="B">${rows("B")}</div><button class="btn btn-admin-secondary admin-season-add" type="button" data-add-season-player ${adminEditMode ? "" : "disabled"}><i class="bi bi-person-plus"></i> Adicionar participante</button></section>
     </div>
+    ${renderSeasonSchedulePreview()}
     <div class="admin-season-actions"><button class="btn btn-admin-secondary" type="button" data-cancel-season>Cancelar alterações</button><button class="btn" type="button" data-save-season ${adminEditMode ? "" : "disabled"}>Salvar temporada</button></div>`;
   editor.querySelectorAll("[data-season-participant] select").forEach((select) => select.addEventListener("change", syncSeasonDraftFromEditor));
   editor.querySelectorAll("[data-season-participant] select").forEach(enhanceSearchablePlayerSelect);
@@ -526,6 +527,9 @@ function renderSeasonEditor() {
   editor.querySelector("[data-cancel-season]")?.addEventListener("click", cancelSeasonChanges);
   editor.querySelector("[data-save-season]")?.addEventListener("click", saveSeasonChanges);
   editor.querySelector("[data-delete-season]")?.addEventListener("click", deleteSeasonDraft);
+  editor.querySelectorAll("[data-draw-season]").forEach((button) =>
+    button.addEventListener("click", () => previewSeasonDraw(button.dataset.drawSeason)),
+  );
   page.querySelector("[data-create-season]").disabled = true;
 }
 
@@ -538,11 +542,148 @@ function syncSeasonDraftFromEditor() {
   editor.classList.toggle("is-dirty", isSeasonDirty());
 }
 
+function renderSeasonSchedulePreview() {
+  const schedules = getEffectiveSeasonSchedules();
+  const playersById = new Map((seasonDraft.jogadores || []).map((player) => [Number(player.id), player]));
+  const playerName = (division, number) => {
+    const participant = seasonDraft.participantes[division][number - 1];
+    return playersById.get(Number(participant?.jogador_id))?.exibicao || `Nº ${number}`;
+  };
+  const divisionPreview = (division) => {
+    const rounds = schedules[division] || [];
+    const totalMatches = rounds.reduce((total, round) => total + round.partidas.length, 0);
+    return `<div class="admin-season-schedule-wrap">
+      <button class="btn btn-admin-secondary admin-season-draw" type="button" data-draw-season="${division}" ${adminEditMode ? "" : "disabled"}><i class="bi bi-shuffle"></i> Simular sorteio da Série ${division}</button>
+      <details class="admin-season-schedule">
+      <summary><span><strong>Chaveamento da Série ${division}</strong><small>${rounds.length} rodadas · ${totalMatches} partidas</small></span><i class="bi bi-chevron-down"></i></summary>
+      <div class="admin-season-round-list">${rounds.map((round) => `
+        <section><h4>Rodada ${round.rodada}</h4>${round.partidas.map((match) => `<p><span>${escapeHtml(playerName(division, match.numero1))}</span><b>×</b><span>${escapeHtml(playerName(division, match.numero2))}</span></p>`).join("")}${round.folga ? `<small class="admin-season-bye"><i class="bi bi-pause-circle"></i> Folga: ${escapeHtml(playerName(division, round.folga))}</small>` : ""}</section>`).join("")}</div>
+      </details>
+    </div>`;
+  };
+  return `<div class="admin-season-schedules"><h3>Prévia do chaveamento</h3><p>Cada participante enfrenta todos os demais uma única vez.</p>${divisionPreview("A")}${divisionPreview("B")}</div>`;
+}
+
+function buildSeasonSchedules(participants) {
+  return Object.fromEntries(["A", "B"].map((division) => {
+    const numbers = participants[division].map((_, index) => index + 1);
+    return [division, buildDivisionSchedule(numbers, division === "B")];
+  }));
+}
+
+function getEffectiveSeasonSchedules() {
+  const schedules = seasonDraft.rodadas;
+  if (schedules?.A?.length && schedules?.B?.length) return schedules;
+  return buildSeasonSchedules(seasonDraft.participantes);
+}
+
+function buildDivisionSchedule(orderedNumbers, standardizeByes = false) {
+    const rotation = orderedNumbers.length % 2 === 0
+      ? [...orderedNumbers]
+      : [...orderedNumbers, null];
+    const rounds = [];
+    let current = [...rotation];
+    for (let roundIndex = 0; roundIndex < current.length - 1; roundIndex += 1) {
+      const matches = [];
+      for (let index = 0; index < current.length / 2; index += 1) {
+        let number1 = current[index];
+        let number2 = current[current.length - 1 - index];
+        if (number1 === null || number2 === null) continue;
+        if ((roundIndex + index) % 2 === 1) [number1, number2] = [number2, number1];
+        matches.push({ numero1: number1, numero2: number2 });
+      }
+      const used = new Set(matches.flatMap((match) => [match.numero1, match.numero2]));
+      const folga = orderedNumbers.find((number) => !used.has(number)) || null;
+      rounds.push({ rodada: roundIndex + 1, tipo: "REGULAR", folga, partidas: matches });
+      current = [current[0], current[current.length - 1], ...current.slice(1, -1)];
+    }
+    if (!standardizeByes || orderedNumbers.length % 2 === 0) return rounds;
+    const byBye = new Map(rounds.map((round) => [Number(round.folga), round]));
+    return [...orderedNumbers]
+      .sort((a, b) => a - b)
+      .map((number, index) => ({
+        ...byBye.get(number),
+        rodada: index + 1,
+        folga: number,
+      }));
+}
+
+function previewSeasonDraw(division) {
+  syncSeasonDraftFromEditor();
+  const numbers = seasonDraft.participantes[division].map((_, index) => index + 1);
+  const currentSignature = getScheduleSignature(getEffectiveSeasonSchedules()[division]);
+  let suggestion = null;
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    suggestion = buildDivisionSchedule(
+      shuffleSeasonNumbers(numbers),
+      division === "B",
+    );
+    if (getScheduleSignature(suggestion) !== currentSignature) break;
+  }
+  const modal = document.createElement("div");
+  modal.className = "admin-modal-backdrop";
+  modal.innerHTML = `<div class="admin-modal admin-draw-modal" role="dialog" aria-modal="true">
+    <i class="bi bi-shuffle"></i>
+    <h2>Sugestão para a Série ${division}</h2>
+    <p>Confira o sorteio antes de aplicá-lo ao rascunho.</p>
+    <div class="admin-draw-preview">${suggestion.map((round) => `
+      <section><h3>Rodada ${round.rodada}</h3>${round.partidas.map((match) => `<p><span>${escapeHtml(getSeasonPlayerName(division, match.numero1))}</span><b>×</b><span>${escapeHtml(getSeasonPlayerName(division, match.numero2))}</span></p>`).join("")}${round.folga ? `<small class="admin-season-bye"><i class="bi bi-pause-circle"></i> Folga: ${escapeHtml(getSeasonPlayerName(division, round.folga))}</small>` : ""}</section>`).join("")}</div>
+    <div class="admin-modal-actions"><button class="btn btn-admin-secondary" type="button" data-cancel>Cancelar</button><button class="btn" type="button" data-apply>Aplicar sugestão</button></div>
+  </div>`;
+  document.querySelector(".admin-modal-backdrop")?.remove();
+  document.body.appendChild(modal);
+  modal.querySelector("[data-cancel]").addEventListener("click", () => modal.remove());
+  modal.querySelector("[data-apply]").addEventListener("click", () => {
+    seasonDraft.rodadas = getEffectiveSeasonSchedules();
+    seasonDraft.rodadas[division] = suggestion;
+    modal.remove();
+    renderSeasonEditor();
+    getPage()?.querySelector("[data-season-editor]")?.classList.add("is-dirty");
+  });
+}
+
+function getScheduleSignature(rounds) {
+  return JSON.stringify((rounds || []).map((round) =>
+    round.partidas.map((match) => [Number(match.numero1), Number(match.numero2)]),
+  ));
+}
+
+function shuffleSeasonNumbers(numbers) {
+  const shuffled = [...numbers];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomValues = new Uint32Array(1);
+    crypto.getRandomValues(randomValues);
+    const target = randomValues[0] % (index + 1);
+    [shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]];
+  }
+  return shuffled;
+}
+
+function getSeasonPlayerName(division, number) {
+  const participant = seasonDraft.participantes[division][number - 1];
+  const player = (seasonDraft.jogadores || []).find(
+    (item) => Number(item.id) === Number(participant?.jogador_id),
+  );
+  return player?.exibicao || `Nº ${number}`;
+}
+
 function isSeasonDirty() {
   if (!seasonDraft) return false;
   if (!savedSeasonDraft) return true;
-  const ids = (draft) => ["A", "B"].map((division) => draft.participantes[division].map((item) => Number(item.jogador_id)));
-  return JSON.stringify(ids(seasonDraft)) !== JSON.stringify(ids(savedSeasonDraft));
+  const comparable = (draft) => ({
+    participantes: ["A", "B"].map((division) =>
+      draft.participantes[division].map((item) => Number(item.jogador_id)),
+    ),
+    rodadas: ["A", "B"].map((division) =>
+      (draft.rodadas?.[division] || []).map((round) =>
+        [
+          Number(round.folga) || null,
+          ...round.partidas.map((match) => [Number(match.numero1), Number(match.numero2)]),
+        ],
+      ),
+    ),
+  });
+  return JSON.stringify(comparable(seasonDraft)) !== JSON.stringify(comparable(savedSeasonDraft));
 }
 
 function addSeasonPlayer() {
@@ -550,6 +691,11 @@ function addSeasonPlayer() {
   const player = seasonDraft.jogadores.find((item) => !used.has(Number(item.id)));
   if (!player) return showAdminModal("Sem jogadores disponíveis", "Cadastre outro jogador antes de adicionar uma nova vaga.", "error");
   seasonDraft.participantes.B.push({ divisao: "B", numero: seasonDraft.participantes.B.length + 1, jogador_id: player.id });
+  seasonDraft.rodadas = getEffectiveSeasonSchedules();
+  seasonDraft.rodadas.B = buildDivisionSchedule(
+    seasonDraft.participantes.B.map((_, index) => index + 1),
+    true,
+  );
   renderSeasonEditor();
   getPage()?.querySelector("[data-season-editor]")?.classList.add("is-dirty");
 }
@@ -559,6 +705,11 @@ function removeSeasonPlayer(event) {
   const row = event.currentTarget.closest("[data-season-participant]");
   const rows = [...row.parentElement.children];
   seasonDraft.participantes.B.splice(rows.indexOf(row), 1);
+  seasonDraft.rodadas = getEffectiveSeasonSchedules();
+  seasonDraft.rodadas.B = buildDivisionSchedule(
+    seasonDraft.participantes.B.map((_, index) => index + 1),
+    true,
+  );
   renderSeasonEditor();
   getPage()?.querySelector("[data-season-editor]")?.classList.add("is-dirty");
 }
@@ -583,7 +734,12 @@ async function saveSeasonChanges() {
   const confirmed = await confirmAdminChange("Salvar preparação?", `A temporada ${seasonDraft.temporada} será salva sem alterar a temporada atual.`);
   if (!confirmed) return;
   try {
-    const data = await saveAdminTemporada(activeAdminSession.token, seasonDraft.temporada, seasonDraft.participantes);
+    const data = await saveAdminTemporada(
+      activeAdminSession.token,
+      seasonDraft.temporada,
+      seasonDraft.participantes,
+      getEffectiveSeasonSchedules(),
+    );
     setSeasonDraft(data);
     await loadAdminSeasons();
     showAdminModal("Temporada salva", "A preparação foi salva e poderá ser retomada em outra sessão.", "success");

@@ -24,6 +24,8 @@ const SHEETS = {
 
   temporadas: "Temporadas",
 
-  temporadasParticipantes: "Temporadas Participantes"
+  temporadasParticipantes: "Temporadas Participantes",
+
+  temporadasRodadas: "Temporadas Rodadas"
 
 };

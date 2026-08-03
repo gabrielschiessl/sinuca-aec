@@ -1001,6 +1001,31 @@
 .admin-season-add { width:100%; margin-top:10px; }
 .admin-season-actions { margin-top:14px; display:flex; justify-content:flex-end; gap:10px; }
 .admin-season-editor.is-dirty .admin-season-editor-heading { box-shadow:inset 3px 0 #eab308; }
+.admin-season-schedules { margin-top:16px; padding:14px; border:1px solid var(--border); border-radius:10px; background:var(--group-bg); }
+.admin-season-schedules > p { margin:3px 0 12px; color:var(--text-muted); font-size:.78rem; }
+.admin-season-schedule { margin-top:8px; border:1px solid var(--border); border-radius:9px; background:var(--panel-bg); }
+.admin-season-schedule-wrap + .admin-season-schedule-wrap { margin-top:12px; }
+.admin-season-draw { width:100%; margin-top:8px; }
+.admin-season-schedule summary { padding:11px 12px; display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; list-style:none; }
+.admin-season-schedule summary::-webkit-details-marker { display:none; }
+.admin-season-schedule summary span { display:flex; flex-direction:column; }
+.admin-season-schedule summary small { color:var(--text-muted); font-size:.7rem; }
+.admin-season-schedule summary i { transition:transform .18s ease; }
+.admin-season-schedule[open] summary i { transform:rotate(180deg); }
+.admin-season-round-list { padding:0 10px 10px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.admin-season-round-list section { min-width:0; padding:9px; border:1px solid var(--border); border-radius:8px; }
+.admin-season-round-list h4 { margin-bottom:6px; color:var(--tab-accent); font-size:.78rem; }
+.admin-season-round-list p { margin:0; padding:4px 0; display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); gap:5px; color:var(--text-muted); font-size:.7rem; }
+.admin-season-round-list p span:first-child { text-align:right; }
+.admin-season-round-list p span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.admin-season-bye { margin-top:6px; padding-top:6px; display:block; border-top:1px dashed var(--border); color:var(--tab-accent); font-size:.68rem; font-weight:700; text-align:center; }
+.admin-draw-modal { width:min(760px,100%); }
+.admin-draw-preview { max-height:52vh; margin-bottom:18px; padding:10px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; overflow:auto; border:1px solid var(--border); border-radius:9px; text-align:left; }
+.admin-draw-preview section { min-width:0; padding:9px; border:1px solid var(--border); border-radius:8px; }
+.admin-draw-preview h3 { margin-bottom:6px; color:var(--tab-accent); font-size:.78rem; }
+.admin-draw-preview p { margin:0; padding:4px 0; display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); gap:5px; color:var(--text-muted); font-size:.7rem; }
+.admin-draw-preview p span:first-child { text-align:right; }
+.admin-draw-preview p span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .btn-admin-danger { background:#991b1b; }
 .admin-module-note { margin:-4px 0 16px; padding:10px 12px; border-radius:8px; background:rgba(255,255,255,.04); color:var(--text-muted); font-size:.78rem; line-height:1.45; }
 .admin-participant-row { padding:11px 12px; display:grid; grid-template-columns:46px minmax(0,1fr); align-items:end; gap:12px; border-bottom:1px solid var(--border); background:var(--group-bg); }
@@ -1081,6 +1106,8 @@
   .admin-player-identity { grid-column:1/-1; }
   .admin-management-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .admin-season-divisions { grid-template-columns:1fr; }
+  .admin-season-round-list { grid-template-columns:1fr; }
+  .admin-draw-preview { grid-template-columns:1fr; }
 }
 
 .admin-footer {

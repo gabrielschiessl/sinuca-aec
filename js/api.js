@@ -158,8 +158,8 @@ export function saveAdminJogadores(token, jogadores) {
   });
 }
 
-export function saveAdminTemporada(token, temporada, participantes) {
-  return post({ acao: "salvar_temporada", token, temporada, participantes }).then((result) => {
+export function saveAdminTemporada(token, temporada, participantes, rodadas) {
+  return post({ acao: "salvar_temporada", token, temporada, participantes, rodadas }).then((result) => {
     cache.clear();
     return result;
   });
