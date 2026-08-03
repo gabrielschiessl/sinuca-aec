@@ -629,11 +629,9 @@ function requestSeasonScheduleStart(division, details) {
   modal.querySelector("[data-confirm]").addEventListener("click", () => {
     const firstDate = parseSeasonDate(dateInput.value);
     if (!firstDate || ![2, 4].includes(firstDate.getDay())) {
-      dateInput.setCustomValidity("Escolha uma terça-feira ou quinta-feira.");
-      dateInput.reportValidity();
+      showSeasonStartDateError(modal, dateInput);
       return;
     }
-    dateInput.setCustomValidity("");
     if (!timeInput.value) {
       timeInput.reportValidity();
       return;
@@ -647,6 +645,24 @@ function requestSeasonScheduleStart(division, details) {
     details.open = true;
     updateSeasonScheduleInputs(division);
     getPage()?.querySelector("[data-season-editor]")?.classList.add("is-dirty");
+  });
+}
+
+function showSeasonStartDateError(startModal, dateInput) {
+  startModal.style.display = "none";
+  const errorModal = document.createElement("div");
+  errorModal.className = "admin-modal-backdrop";
+  errorModal.innerHTML = `<div class="admin-modal" role="alertdialog" aria-modal="true">
+    <i class="bi bi-exclamation-triangle"></i>
+    <h2>Data inicial inválida</h2>
+    <p>A primeira rodada deve começar em uma terça-feira ou quinta-feira.</p>
+    <button class="btn" type="button">Entendi</button>
+  </div>`;
+  document.body.appendChild(errorModal);
+  errorModal.querySelector("button").addEventListener("click", () => {
+    errorModal.remove();
+    startModal.style.display = "";
+    dateInput.focus();
   });
 }
 

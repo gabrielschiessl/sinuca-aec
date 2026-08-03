@@ -70,6 +70,17 @@ function prepararNovaTemporada(temporadaInformada) {
     A: montarSugestaoParticipantes(serieA, "A"),
     B: montarSugestaoParticipantes(serieB, "B"),
   };
+  const rodadas = gerarChaveamentoTemporada(participantes);
+  rodadas.A = copiarChaveamentoAtualDivisao("A", participantes.A.length);
+  const temporadaAtual = getTemporadaAtual();
+  const totalAtualSerieB = getSheetAsObjects(SHEETS.participantes)
+    .filter((participante) =>
+      Number(participante.temporada) === temporadaAtual &&
+      String(participante.divisao).trim().toUpperCase() === "B",
+    ).length;
+  if (participantes.B.length === totalAtualSerieB) {
+    rodadas.B = copiarChaveamentoAtualDivisao("B", participantes.B.length);
+  }
 
   return {
     persistida: false,
@@ -77,7 +88,7 @@ function prepararNovaTemporada(temporadaInformada) {
     versao: 1,
     status: TEMPORADA_STATUS.PREPARACAO,
     participantes,
-    rodadas: gerarChaveamentoTemporada(participantes),
+    rodadas,
     jogadores: getJogadores().sort((a, b) => a.exibicao.localeCompare(b.exibicao, "pt-BR")),
   };
 }
@@ -255,7 +266,11 @@ function excluirTemporadaPreparacao(temporadaInformada) {
       temporada,
       versao,
     );
-    abaTemporadas.deleteRow(indice + 1);
+    excluirLinhasPorTemporadaVersao(
+      abaTemporadas,
+      temporada,
+      versao,
+    );
     delete CACHE[SHEETS.temporadas];
     delete CACHE[SHEETS.temporadasParticipantes];
     delete CACHE[SHEETS.temporadasRodadas];
@@ -408,6 +423,53 @@ function gerarChaveamentoTemporada(participantes) {
     validarChaveamentoTodosContraTodos(resultado[divisao], numeros, divisao);
   });
   return resultado;
+}
+
+function copiarChaveamentoAtualDivisao(divisaoInformada, totalParticipantes) {
+  const divisao = String(divisaoInformada).trim().toUpperCase();
+  const temporadaAtual = getTemporadaAtual();
+  const totalRodadas = totalParticipantes % 2 === 0
+    ? totalParticipantes - 1
+    : totalParticipantes;
+  const partidasAtuais = getSheetAsObjects(SHEETS.rodadas)
+    .filter((partida) =>
+      Number(partida.temporada) === temporadaAtual &&
+      String(partida.divisao).trim().toUpperCase() === divisao &&
+      Number(partida.rodada) >= 1 &&
+      Number(partida.rodada) <= totalRodadas,
+    );
+  const mapa = {};
+
+  partidasAtuais.forEach((partida) => {
+    const rodada = Number(partida.rodada);
+    if (!mapa[rodada]) {
+      mapa[rodada] = {
+        rodada,
+        tipo: "REGULAR",
+        folga: null,
+        partidas: [],
+      };
+    }
+    mapa[rodada].partidas.push({
+      numero1: Number(partida.numero1),
+      numero2: Number(partida.numero2),
+      data: "",
+      hora: "19:00",
+    });
+  });
+
+  const rodadas = Object.values(mapa).sort((a, b) => a.rodada - b.rodada);
+  const numeros = Array.from({ length: totalParticipantes }, (_, indice) => indice + 1);
+  if (divisao === "B" && totalParticipantes % 2 === 1) {
+    rodadas.forEach((rodada) => {
+      const usados = new Set(
+        rodada.partidas.flatMap((partida) => [partida.numero1, partida.numero2]),
+      );
+      rodada.folga = numeros.find((numero) => !usados.has(numero)) || null;
+    });
+  }
+  validarChaveamentoTodosContraTodos(rodadas, numeros, divisao);
+  return rodadas;
 }
 
 function gerarRodadasTodosContraTodos(numerosInformados) {
@@ -626,10 +688,21 @@ function corrigirFolgasChaveamentoCarregado(rodadas, participantes) {
 }
 
 function excluirLinhasPorTemporadaVersao(aba, temporada, versao) {
-  const valores = aba.getDataRange().getDisplayValues();
-  for (let indice = valores.length - 1; indice >= 1; indice -= 1) {
-    if (Number(valores[indice][0]) === temporada && (Number(valores[indice][1]) || 1) === versao) {
-      aba.deleteRow(indice + 1);
-    }
+  const ultimaLinha = aba.getLastRow();
+  const ultimaColuna = aba.getLastColumn();
+  if (ultimaLinha <= 1 || ultimaColuna < 1) return;
+
+  const intervalo = aba.getRange(2, 1, ultimaLinha - 1, ultimaColuna);
+  const valores = intervalo.getValues();
+  const restantes = valores.filter((linha) =>
+    !(
+      Number(linha[0]) === Number(temporada) &&
+      (Number(linha[1]) || 1) === Number(versao)
+    ),
+  );
+
+  intervalo.clearContent();
+  if (restantes.length) {
+    aba.getRange(2, 1, restantes.length, ultimaColuna).setValues(restantes);
   }
 }
