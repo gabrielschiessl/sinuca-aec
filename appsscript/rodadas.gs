@@ -29,7 +29,37 @@ function getRodadas(serie, temporadaInformada) {
     montarPartida(partida, temporada, serieNormalizada),
   );
 
-  return agruparRodadas(resultado);
+  const rodadas = agruparRodadas(resultado);
+  if (serieNormalizada !== "B") return rodadas;
+
+  const participantes = getSheetAsObjects(SHEETS.participantes)
+    .filter((participante) =>
+      Number(participante.temporada) === Number(temporada) &&
+      String(participante.divisao).trim().toUpperCase() === serieNormalizada,
+    );
+  if (participantes.length % 2 === 0) return rodadas;
+
+  rodadas.forEach((rodada) => {
+    const numerosEmJogo = new Set(
+      rodada.partidas.flatMap((partida) => [
+        Number(partida.jogador1.numero),
+        Number(partida.jogador2.numero),
+      ]),
+    );
+    const participante = participantes.find(
+      (item) => !numerosEmJogo.has(Number(item.numero)),
+    );
+    if (!participante) return;
+    const jogador = getJogador(participante.jogador_id);
+    rodada.folga = {
+      id: Number(jogador.id),
+      numero: Number(participante.numero),
+      nome: jogador.nome,
+      exibicao: jogador.exibicao,
+      apelido: jogador.apelido,
+    };
+  });
+  return rodadas;
 }
 
 function getPartidasAdmin(serie) {

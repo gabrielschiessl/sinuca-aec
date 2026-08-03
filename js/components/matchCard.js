@@ -68,3 +68,16 @@ export function matchCard(partida) {
 
 `;
 }
+
+export function byeMatchCard(jogador) {
+  if (!jogador) return "";
+  return `
+<div class="match-card bye" data-player1="${jogador.id}" data-player2="">
+  <div class="match-header">
+    <span class="status-badge status-bye">Folga</span>
+  </div>
+  <div class="match-body">
+    <div class="player-name">${jogador.exibicao}</div>
+  </div>
+</div>`;
+}

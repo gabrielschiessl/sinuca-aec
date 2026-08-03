@@ -114,6 +114,45 @@ Após uma alteração confirmada, o sistema deve atualizar:
 - cartilhas agrupadas por rodadas;
 - site público e painel administrativo.
 
+## Próximas entregas
+
+1. Cadastro manual de temporadas históricas, com participantes, chaveamento,
+   datas, horários, placares e resultados.
+2. Importação opcional por planilha para temporadas históricas e para os fluxos
+   equivalentes da temporada atual, sempre com validação e prévia antes de
+   gravar.
+3. Edição administrativa de partidas, datas e horários das rodadas da temporada
+   atual.
+4. **Ranking geral do campeonato**, iniciado somente depois da conclusão e
+   validação dos três itens anteriores. Os critérios e a apresentação do ranking
+   serão definidos com o responsável pelo projeto antes da implementação.
+
+### Regras preliminares do ranking
+
+- O ranking exibirá no máximo 30 jogadores.
+- A pontuação considerará somente as cinco temporadas mais recentes.
+- Somente participações na Série A gerarão pontos.
+- Um jogador poderá permanecer entre os 30 mesmo sem disputar a Série A em uma
+  das cinco temporadas; nessa temporada específica ele apenas receberá zero
+  ponto.
+- Os pesos e critérios exatos de pontuação serão definidos antes da
+  implementação.
+
+### Modelo para importação por planilha
+
+- A importação será uma alternativa ao preenchimento manual, não uma etapa
+  obrigatória.
+- Ao escolher “Importar planilha”, o administrador verá as orientações e um
+  botão para baixar um arquivo `.xlsx` de exemplo.
+- O modelo terá abas, cabeçalhos, formatos e exemplos compatíveis exatamente
+  com o cadastro manual de participantes, rodadas, partidas e resultados.
+- O arquivo será versionado com o site e disponibilizado para download direto,
+  evitando dependência de permissões ou disponibilidade do Google Drive.
+- Antes da gravação, o sistema exibirá uma prévia, apontará linhas inválidas e
+  exigirá confirmação explícita.
+- A definição final dos cabeçalhos ocorrerá depois que o formato do cadastro
+  manual estiver consolidado, para impedir divergência entre os dois fluxos.
+
 ## Atualização automática do site
 
 O site é estático no GitHub Pages e a API usa Apps Script. Essa arquitetura não

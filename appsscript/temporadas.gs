@@ -24,9 +24,9 @@ function getTemporadasAdmin() {
         const temporada = Number(registro.temporada);
         const versao = Number(registro.versao) || 1;
         const origemParticipantes =
-          String(registro.status).trim().toUpperCase() === TEMPORADA_STATUS.ATIVA
-            ? participantesAtuais
-            : participantes;
+          String(registro.status).trim().toUpperCase() === TEMPORADA_STATUS.PREPARACAO
+            ? participantes
+            : participantesAtuais;
         const vinculados = origemParticipantes.filter(
           (participante) =>
             Number(participante.temporada) === temporada &&
@@ -46,6 +46,251 @@ function getTemporadasAdmin() {
       })
       .sort((a, b) => b.temporada - a.temporada || b.versao - a.versao),
   };
+}
+
+function prepararTemporadaLegada(temporadaInformada) {
+  garantirEstruturaTemporadas();
+  const temporada = validarAnoTemporadaLegada(temporadaInformada);
+  const temporadaAtual = getTemporadaAtual();
+  const participantesAtuais = getSheetAsObjects(SHEETS.participantes)
+    .filter((item) => Number(item.temporada) === temporadaAtual)
+    .sort((a, b) => Number(a.numero) - Number(b.numero));
+  const participantes = {
+    A: participantesAtuais
+      .filter((item) => String(item.divisao).trim().toUpperCase() === "A")
+      .map(normalizarParticipanteTemporada),
+    B: participantesAtuais
+      .filter((item) => String(item.divisao).trim().toUpperCase() === "B")
+      .map(normalizarParticipanteTemporada),
+  };
+  const rodadas = gerarChaveamentoTemporada(participantes);
+  ["A", "B"].forEach((divisao) => {
+    rodadas[divisao].forEach((rodada) => rodada.partidas.forEach((partida) => {
+      partida.status = "E";
+      partida.placar1 = "-";
+      partida.placar2 = "-";
+    }));
+  });
+  return {
+    persistida: false,
+    modo: "LEGADA",
+    temporada,
+    versao: 1,
+    status: TEMPORADA_STATUS.PREPARACAO,
+    tipo: "LEGADA",
+    participantes,
+    rodadas,
+    jogadores: getJogadores().sort((a, b) => a.exibicao.localeCompare(b.exibicao, "pt-BR")),
+  };
+}
+
+function validarAnoTemporadaLegada(valor) {
+  const temporada = Number(valor);
+  const temporadaAtual = getTemporadaAtual();
+  if (!Number.isInteger(temporada) || temporada < 1900 || temporada >= temporadaAtual) {
+    throw new Error(`Informe um ano anterior à temporada atual (${temporadaAtual}).`);
+  }
+  const existente = getSheetAsObjects(SHEETS.temporadas).some(
+    (item) => Number(item.temporada) === temporada,
+  );
+  if (existente) throw new Error(`A temporada ${temporada} já está cadastrada.`);
+  return temporada;
+}
+
+function salvarTemporadaLegada(dados) {
+  garantirEstruturaTemporadas();
+  const temporada = Number(dados.temporada);
+  if (!Number.isInteger(temporada) || temporada < 1900 || temporada >= getTemporadaAtual()) {
+    throw new Error("Informe uma temporada passada válida.");
+  }
+  const registro = getSheetAsObjects(SHEETS.temporadas).find(
+    (item) => Number(item.temporada) === temporada,
+  );
+  if (registro && (
+    String(registro.status).trim().toUpperCase() !== TEMPORADA_STATUS.PREPARACAO ||
+    normalizarTipoTemporada(registro.tipo) !== "LEGADA"
+  )) {
+    throw new Error(`A temporada ${temporada} já está cadastrada.`);
+  }
+  const conteudo = normalizarRascunhoTemporadaLegada(dados);
+  const participantes = conteudo.participantes;
+  const rodadas = conteudo.rodadas;
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const agora = new Date();
+    const versao = Number(registro?.versao) || 1;
+    const abaTemporadas = planilha.getSheetByName(SHEETS.temporadas);
+    const valores = abaTemporadas.getDataRange().getDisplayValues();
+    const indice = valores.findIndex((linha, linhaIndice) =>
+      linhaIndice > 0 && Number(linha[0]) === temporada,
+    );
+    if (indice > 0) {
+      abaTemporadas.getRange(indice + 1, 6).setValue(agora);
+    } else {
+      abaTemporadas.appendRow([
+        temporada, versao, TEMPORADA_STATUS.PREPARACAO, "LEGADA", agora, agora,
+      ]);
+    }
+    const abaParticipantes = planilha.getSheetByName(SHEETS.temporadasParticipantes);
+    const abaRodadas = planilha.getSheetByName(SHEETS.temporadasRodadas);
+    excluirLinhasPorTemporadaVersao(abaParticipantes, temporada, versao);
+    excluirLinhasPorTemporadaVersao(abaRodadas, temporada, versao);
+    adicionarObjetosAba(
+      abaParticipantes,
+      ["A", "B"].flatMap((divisao) => participantes[divisao].map((item, indiceParticipante) => ({
+        temporada, versao, divisao, numero: indiceParticipante + 1, jogador_id: item.jogador_id,
+      }))),
+    );
+    adicionarObjetosAba(
+      abaRodadas,
+      ["A", "B"].flatMap((divisao) => rodadas[divisao].flatMap((rodada) =>
+        rodada.partidas.map((partida) => ({
+          temporada, versao, divisao, rodada: rodada.rodada, tipo: "REGULAR",
+          numero1: partida.numero1, numero2: partida.numero2,
+          data: partida.data, hora: partida.hora, status: partida.status,
+          placar1: partida.placar1, placar2: partida.placar2,
+          observacao: "", atualizado_em: agora, folga: rodada.folga || "",
+        })),
+      )),
+    );
+    Object.keys(CACHE).forEach((chave) => { delete CACHE[chave]; });
+    return { sucesso: true, ...getTemporadaPreparacao(temporada) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function normalizarRascunhoTemporadaLegada(dados) {
+  const participantes = validarParticipantesTemporada(dados.participantes);
+  const rodadasValidadas = validarRodadasTemporadaInformadas(dados.rodadas, participantes);
+  const placaresPermitidos = new Set(["-", "0", "1", "2"]);
+  const rodadas = ["A", "B"].reduce((resultado, divisao) => {
+    resultado[divisao] = rodadasValidadas[divisao].map((rodada, indiceRodada) => ({
+      ...rodada,
+      partidas: rodada.partidas.map((partida, indicePartida) => {
+        const informada = dados.rodadas[divisao][indiceRodada].partidas[indicePartida] || {};
+        const placar1 = String(informada.placar1 ?? "-").trim() || "-";
+        const placar2 = String(informada.placar2 ?? "-").trim() || "-";
+        if (!placaresPermitidos.has(placar1) || !placaresPermitidos.has(placar2)) {
+          throw new Error("Uma partida histórica possui um placar inválido.");
+        }
+        return { ...partida, status: "E", placar1, placar2 };
+      }),
+    }));
+    return resultado;
+  }, {});
+  return { participantes, rodadas };
+}
+
+function validarConteudoTemporadaLegada(dados) {
+  const participantes = validarParticipantesTemporada(dados.participantes);
+  const rodadasValidadas = validarRodadasTemporadaInformadas(dados.rodadas, participantes);
+  const rodadas = ["A", "B"].reduce((resultado, divisao) => {
+    resultado[divisao] = rodadasValidadas[divisao].map((rodada, indiceRodada) => ({
+      ...rodada,
+      partidas: rodada.partidas.map((partida, indicePartida) => {
+        const informada = dados.rodadas[divisao][indiceRodada].partidas[indicePartida] || {};
+        const estado = validarEstadoPartida(
+          "E",
+          informada.placar1,
+          informada.placar2,
+        );
+        return { ...partida, ...estado };
+      }),
+    }));
+    return resultado;
+  }, {});
+  validarAgendaPublicacaoTemporada(rodadas);
+  return { participantes, rodadas };
+}
+
+function publicarTemporadaLegada(temporadaInformada) {
+  garantirEstruturaTemporadas();
+  const temporada = Number(temporadaInformada);
+  const rascunho = getTemporadaPreparacao(temporada);
+  if (rascunho.modo !== "LEGADA") {
+    throw new Error("Este rascunho não é uma temporada passada.");
+  }
+  const { participantes, rodadas } = validarConteudoTemporadaLegada(rascunho);
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const agora = new Date();
+    const abaParticipantes = planilha.getSheetByName(SHEETS.participantes);
+    const abaRodadas = planilha.getSheetByName(SHEETS.rodadas);
+    const abaTemporadas = planilha.getSheetByName(SHEETS.temporadas);
+    const valoresTemporadas = abaTemporadas.getDataRange().getDisplayValues();
+    const linhaRascunho = valoresTemporadas.findIndex((linha, indice) =>
+      indice > 0 && Number(linha[0]) === temporada,
+    );
+    if (linhaRascunho < 1) throw new Error("Rascunho da temporada não encontrado.");
+    excluirLinhasPorTemporada(abaParticipantes, temporada);
+    excluirLinhasPorTemporada(abaRodadas, temporada);
+    try {
+      adicionarObjetosAba(
+        abaParticipantes,
+        ["A", "B"].flatMap((divisao) =>
+          participantes[divisao].map((item, indice) => ({
+            temporada,
+            divisao,
+            numero: indice + 1,
+            jogador_id: item.jogador_id,
+          })),
+        ),
+      );
+      adicionarObjetosAba(
+        abaRodadas,
+        ["A", "B"].flatMap((divisao) =>
+          rodadas[divisao].flatMap((rodada) =>
+            rodada.partidas.map((partida) => ({
+              temporada,
+              divisao,
+              rodada: rodada.rodada,
+              numero1: partida.numero1,
+              numero2: partida.numero2,
+              data: formatarDataPublicadaTemporada(partida.data),
+              hora: partida.hora,
+              status: partida.status,
+              placar1: partida.placar1,
+              placar2: partida.placar2,
+              observacao: "",
+              atualizado_em: agora,
+            })),
+          ),
+        ),
+      );
+      abaTemporadas.getRange(linhaRascunho + 1, 3).setValue(TEMPORADA_STATUS.ARQUIVADA);
+      abaTemporadas.getRange(linhaRascunho + 1, 6).setValue(agora);
+    } catch (error) {
+      try {
+        excluirLinhasPorTemporada(abaParticipantes, temporada);
+        excluirLinhasPorTemporada(abaRodadas, temporada);
+        abaTemporadas.getRange(linhaRascunho + 1, 3).setValue(TEMPORADA_STATUS.PREPARACAO);
+      } catch (cleanupError) {
+        // A falha original é preservada; uma nova tentativa detectará resíduos.
+      }
+      throw error;
+    }
+    try {
+      excluirLinhasPorTemporadaVersao(
+        planilha.getSheetByName(SHEETS.temporadasParticipantes), temporada, rascunho.versao,
+      );
+      excluirLinhasPorTemporadaVersao(
+        planilha.getSheetByName(SHEETS.temporadasRodadas), temporada, rascunho.versao,
+      );
+    } catch (cleanupError) {
+      // A publicação já foi concluída; resíduos do rascunho não afetam a temporada arquivada.
+    }
+    Object.keys(CACHE).forEach((chave) => { delete CACHE[chave]; });
+    return { sucesso: true, temporada, status: TEMPORADA_STATUS.ARQUIVADA };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function prepararNovaTemporada(temporadaInformada) {
@@ -104,6 +349,7 @@ function getTemporadaPreparacao(temporadaInformada) {
   if (!registro) throw new Error("Temporada em preparação não encontrada.");
 
   const versao = Number(registro.versao) || 1;
+  const modo = normalizarTipoTemporada(registro.tipo) === "LEGADA" ? "LEGADA" : "NOVA";
   const participantes = getSheetAsObjects(SHEETS.temporadasParticipantes)
     .filter(
       (item) =>
@@ -133,6 +379,7 @@ function getTemporadaPreparacao(temporadaInformada) {
 
   return {
     persistida: true,
+    modo,
     temporada,
     versao,
     status: TEMPORADA_STATUS.PREPARACAO,
@@ -237,9 +484,6 @@ function salvarTemporadaPreparacao(dados) {
 function excluirTemporadaPreparacao(temporadaInformada) {
   garantirEstruturaTemporadas();
   const temporada = Number(temporadaInformada);
-  if (temporada <= getTemporadaAtual()) {
-    throw new Error("A temporada atual ou uma temporada histórica não pode ser excluída.");
-  }
 
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -884,6 +1128,8 @@ function normalizarRodadaTemporada(item) {
     data: normalizarDataPreparacaoLida(item.data),
     hora: normalizarHoraPreparacaoLida(item.hora) || "19:00",
     status: item.status || "A",
+    placar1: item.placar1 === "" ? "-" : item.placar1,
+    placar2: item.placar2 === "" ? "-" : item.placar2,
     folga: Number(item.folga) || null,
   };
 }
@@ -925,6 +1171,8 @@ function agruparChaveamentoTemporada(partidas) {
           data: partida.data,
           hora: partida.hora,
           status: partida.status,
+          placar1: partida.placar1,
+          placar2: partida.placar2,
         });
       });
     resultado[divisao] = Object.values(mapa).sort((a, b) => a.rodada - b.rodada);

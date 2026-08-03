@@ -142,6 +142,10 @@ export function prepareAdminTemporada(token, temporada) {
   return post({ acao: "preparar_temporada", token, temporada });
 }
 
+export function prepareAdminTemporadaLegada(token, temporada) {
+  return post({ acao: "preparar_temporada_legada", token, temporada });
+}
+
 export function getAdminTemporada(token, temporada) {
   return post({ acao: "carregar_temporada", token, temporada });
 }
@@ -168,6 +172,20 @@ export function saveAdminJogadores(token, jogadores) {
 
 export function saveAdminTemporada(token, temporada, participantes, rodadas) {
   return post({ acao: "salvar_temporada", token, temporada, participantes, rodadas }).then((result) => {
+    cache.clear();
+    return result;
+  });
+}
+
+export function saveAdminTemporadaLegada(token, temporada, participantes, rodadas) {
+  return post({ acao: "salvar_temporada_legada", token, temporada, participantes, rodadas }).then((result) => {
+    cache.clear();
+    return result;
+  });
+}
+
+export function publishAdminTemporadaLegada(token, temporada) {
+  return post({ acao: "publicar_temporada_legada", token, temporada }).then((result) => {
     cache.clear();
     return result;
   });

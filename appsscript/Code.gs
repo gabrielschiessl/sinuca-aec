@@ -65,6 +65,10 @@ function doPost(e) {
         validarSessaoAdmin(dados.token);
         return responder(prepararNovaTemporada(dados.temporada));
 
+      case "preparar_temporada_legada":
+        validarSessaoAdmin(dados.token);
+        return responder(prepararTemporadaLegada(dados.temporada));
+
       case "carregar_temporada":
         validarSessaoAdmin(dados.token);
         return responder(getTemporadaPreparacao(dados.temporada));
@@ -80,6 +84,14 @@ function doPost(e) {
       case "salvar_temporada":
         validarSessaoAdmin(dados.token);
         return responder(salvarTemporadaPreparacao(dados));
+
+      case "salvar_temporada_legada":
+        validarSessaoAdmin(dados.token);
+        return responder(salvarTemporadaLegada(dados));
+
+      case "publicar_temporada_legada":
+        validarSessaoAdmin(dados.token);
+        return responder(publicarTemporadaLegada(dados.temporada));
 
       case "excluir_temporada":
         validarSessaoAdmin(dados.token);

@@ -1,4 +1,4 @@
-import { matchCard } from "./matchCard.js";
+import { byeMatchCard, matchCard } from "./matchCard.js";
 import { formatDate } from "../utils/date.js";
 
 export function roundGroup(rodada) {
@@ -37,6 +37,7 @@ export function roundGroup(rodada) {
 
     <div class="round-content">
         <div class="round-matches">
+            ${byeMatchCard(rodada.folga)}
             ${rodada.partidas.map((partida) => matchCard(partida)).join("")}
         </div>
     </div>

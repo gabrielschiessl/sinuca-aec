@@ -13,12 +13,15 @@ import {
   getAdminTemporada,
   getAdminTemporadas,
   prepareAdminTemporada,
+  prepareAdminTemporadaLegada,
+  publishAdminTemporadaLegada,
   activateAdminTemporada,
   deleteAdminTemporada,
   saveAdminJogadores,
   saveAdminPartidas,
   saveAdminParticipantes,
   saveAdminTemporada,
+  saveAdminTemporadaLegada,
 } from "../api.js";
 import { setKnownCurrentSeason } from "../config.js";
 
@@ -302,6 +305,10 @@ function renderDashboard(session) {
           <label><span>Ano da nova temporada</span><select class="admin-select" data-season-year></select></label>
           <button class="btn" type="button" data-create-season>${CREATE_SEASON_BUTTON_HTML}</button>
         </div>
+        <div class="admin-season-create admin-season-create-legacy">
+          <label><span>Ano da temporada passada</span><input class="admin-input" type="number" min="1900" data-season-legacy-year></label>
+          <button class="btn btn-admin-secondary" type="button" data-create-legacy-season><i class="bi bi-archive"></i> Cadastrar temporada passada</button>
+        </div>
         <div data-season-editor hidden></div>
       </section>
 
@@ -324,6 +331,7 @@ function renderDashboard(session) {
   page.querySelector("[data-player-division-filter]")?.addEventListener("change", applyAdminPlayerFilters);
   page.querySelector("[data-player-search-filter]")?.addEventListener("input", applyAdminPlayerFilters);
   page.querySelector("[data-create-season]")?.addEventListener("click", createSeasonDraft);
+  page.querySelector("[data-create-legacy-season]")?.addEventListener("click", createLegacySeasonDraft);
   loadAdminMatches("A", false);
 }
 
@@ -437,11 +445,12 @@ function renderSeasonList(data) {
   const page = getPage();
   const container = page?.querySelector("[data-admin-seasons]");
   const yearSelect = page?.querySelector("[data-season-year]");
+  const legacyYear = page?.querySelector("[data-season-legacy-year]");
   if (!container || !yearSelect) return;
   const seasons = data.temporadas || [];
   container.innerHTML = seasons.map((season) => `
     <article class="admin-season-summary ${season.status === "ATIVA" ? "is-current" : ""}">
-      <div><strong>Temporada ${season.temporada}</strong><span>${season.status === "ATIVA" ? "Atual e publicada" : season.status === "ARQUIVADA" ? "Temporada histórica" : "Preparação salva"}</span></div>
+      <div><strong>Temporada ${season.temporada}</strong><span>${season.status === "ATIVA" ? "Atual e publicada" : season.status === "ARQUIVADA" ? "Temporada histórica" : season.tipo === "LEGADA" ? "Rascunho histórico" : "Preparação salva"}</span></div>
       <small>Série A: ${season.participantes_a} · Série B: ${season.participantes_b}</small>
       ${season.status === "PREPARACAO" ? `<button class="btn btn-admin-secondary" type="button" data-edit-season="${season.temporada}">Editar</button>` : ""}
     </article>`).join("");
@@ -451,7 +460,34 @@ function renderSeasonList(data) {
     .filter((year) => !used.has(year))
     .map((year) => `<option value="${year}">${year}</option>`).join("");
   page.querySelector("[data-create-season]").disabled = !yearSelect.value || Boolean(seasonDraft);
+  if (legacyYear) {
+    legacyYear.max = String(Number(data.temporada_atual) - 1);
+    let suggestedLegacyYear = Number(data.temporada_atual) - 1;
+    while (used.has(suggestedLegacyYear) && suggestedLegacyYear >= 1900) {
+      suggestedLegacyYear -= 1;
+    }
+    legacyYear.value = suggestedLegacyYear >= 1900 ? String(suggestedLegacyYear) : "";
+  }
+  page.querySelector("[data-create-legacy-season]").disabled = Boolean(seasonDraft);
   container.querySelectorAll("[data-edit-season]").forEach((button) => button.addEventListener("click", () => openSavedSeason(Number(button.dataset.editSeason))));
+}
+
+async function createLegacySeasonDraft() {
+  if (!adminEditMode) {
+    showAdminModal("Ative o modo de edição", "Para cadastrar uma temporada passada, primeiro ative o modo de edição.", "error");
+    return;
+  }
+  const year = Number(getPage()?.querySelector("[data-season-legacy-year]")?.value);
+  if (!year) return;
+  const button = getPage()?.querySelector("[data-create-legacy-season]");
+  if (button) button.disabled = true;
+  try {
+    setSeasonDraft(await prepareAdminTemporadaLegada(activeAdminSession.token, year));
+  } catch (error) {
+    showAdminModal("Não foi possível iniciar o cadastro", error.message, "error");
+  } finally {
+    if (button) button.disabled = Boolean(seasonDraft);
+  }
 }
 
 async function createSeasonDraft() {
@@ -515,13 +551,13 @@ function renderSeasonEditor() {
     </div>`).join("");
   editor.hidden = false;
   editor.innerHTML = `
-    <div class="admin-season-editor-heading"><div><strong>Temporada ${seasonDraft.temporada}</strong><span>${seasonDraft.persistida ? "Preparação salva" : "Novo rascunho não salvo"}</span></div>${seasonDraft.persistida ? '<div class="admin-season-editor-controls"><button class="btn" type="button" data-activate-season>Ativar temporada</button><button class="btn btn-admin-danger" type="button" data-delete-season>Excluir temporada</button></div>' : ""}</div>
+    <div class="admin-season-editor-heading"><div><strong>Temporada ${seasonDraft.temporada}</strong><span>${seasonDraft.modo === "LEGADA" ? seasonDraft.persistida ? "Rascunho histórico salvo" : "Cadastro de temporada passada" : seasonDraft.persistida ? "Preparação salva" : "Novo rascunho não salvo"}</span></div>${seasonDraft.persistida ? `<div class="admin-season-editor-controls"><button class="btn" type="button" data-activate-season>${seasonDraft.modo === "LEGADA" ? "Publicar" : "Ativar temporada"}</button><button class="btn btn-admin-danger" type="button" data-delete-season>Excluir temporada</button></div>` : ""}</div>
     <div class="admin-season-divisions">
       <section><h3>Série A <small>20 participantes</small></h3><div data-season-list="A">${rows("A")}</div></section>
       <section><h3>Série B <small>${seasonDraft.participantes.B.length} participantes</small></h3><div data-season-list="B">${rows("B")}</div><button class="btn btn-admin-secondary admin-season-add" type="button" data-add-season-player ${adminEditMode ? "" : "disabled"}><i class="bi bi-person-plus"></i> Adicionar participante</button></section>
     </div>
     ${renderSeasonSchedulePreview()}
-    <div class="admin-season-actions"><button class="btn btn-admin-secondary" type="button" data-cancel-season>Cancelar alterações</button><button class="btn" type="button" data-save-season ${adminEditMode ? "" : "disabled"}>Salvar temporada</button></div>`;
+    <div class="admin-season-actions"><button class="btn btn-admin-secondary" type="button" data-cancel-season>Cancelar alterações</button><button class="btn" type="button" data-save-season ${adminEditMode ? "" : "disabled"}>${seasonDraft.modo === "LEGADA" ? "Salvar rascunho" : "Salvar temporada"}</button></div>`;
   editor.querySelectorAll("[data-season-participant] select").forEach((select) => select.addEventListener("change", syncSeasonDraftFromEditor));
   editor.querySelectorAll("[data-season-participant] select").forEach(enhanceSearchablePlayerSelect);
   editor.querySelectorAll("[data-remove-season-player]").forEach((button) => button.addEventListener("click", removeSeasonPlayer));
@@ -544,6 +580,7 @@ function renderSeasonEditor() {
   );
   enableSeasonSchedulePickers(editor);
   page.querySelector("[data-create-season]").disabled = true;
+  page.querySelector("[data-create-legacy-season]").disabled = true;
 }
 
 function syncSeasonDraftFromEditor() {
@@ -565,8 +602,11 @@ function renderSeasonSchedulePreview() {
   const divisionPreview = (division) => {
     const rounds = schedules[division] || [];
     const totalMatches = rounds.reduce((total, round) => total + round.partidas.length, 0);
+    const drawButton = seasonDraft.modo === "LEGADA"
+      ? ""
+      : `<button class="btn btn-admin-secondary admin-season-draw" type="button" data-draw-season="${division}" ${adminEditMode ? "" : "disabled"}><i class="bi bi-shuffle"></i> Simular sorteio da Série ${division}</button>`;
     return `<div class="admin-season-schedule-wrap">
-      <button class="btn btn-admin-secondary admin-season-draw" type="button" data-draw-season="${division}" ${adminEditMode ? "" : "disabled"}><i class="bi bi-shuffle"></i> Simular sorteio da Série ${division}</button>
+      ${drawButton}
       <details class="admin-season-schedule" data-season-schedule-details data-division="${division}">
       <summary><span><strong>Chaveamento da Série ${division}</strong><small>${rounds.length} rodadas · ${totalMatches} partidas</small></span><i class="bi bi-chevron-down"></i></summary>
       <div class="admin-season-round-list">${rounds.map((round) => renderSeasonRoundSchedule(division, round, playerName)).join("")}</div>
@@ -585,9 +625,16 @@ function renderSeasonRoundSchedule(division, round, playerName) {
       <label><span>Data da rodada</span><input class="admin-input" type="date" value="${escapeHtml(commonDate)}" data-season-round-field="data" data-division="${division}" data-round-index="${round.rodada - 1}" ${adminEditMode ? "" : "disabled"}></label>
       <label><span>Horário da rodada</span><input class="admin-input" type="time" value="${escapeHtml(commonTime)}" data-season-round-field="hora" data-division="${division}" data-round-index="${round.rodada - 1}" ${adminEditMode ? "" : "disabled"}></label>
     </div>
-    ${round.partidas.map((match, matchIndex) => `<div class="admin-season-match-preview"><p><span>${escapeHtml(playerName(division, match.numero1))}</span><b>×</b><span>${escapeHtml(playerName(division, match.numero2))}</span></p><div class="admin-season-match-schedule"><label><span>Data</span><input class="admin-input" type="date" value="${escapeHtml(match.data || "")}" data-season-schedule-field="data" data-division="${division}" data-round-index="${round.rodada - 1}" data-match-index="${matchIndex}" ${adminEditMode ? "" : "disabled"}></label><label><span>Horário</span><input class="admin-input" type="time" value="${escapeHtml(match.hora || "19:00")}" data-season-schedule-field="hora" data-division="${division}" data-round-index="${round.rodada - 1}" data-match-index="${matchIndex}" ${adminEditMode ? "" : "disabled"}></label></div></div>`).join("")}
+    ${round.partidas.map((match, matchIndex) => `<div class="admin-season-match-preview"><p><span>${escapeHtml(playerName(division, match.numero1))}</span><b>×</b><span>${escapeHtml(playerName(division, match.numero2))}</span></p><div class="admin-season-match-schedule"><label><span>Data</span><input class="admin-input" type="date" value="${escapeHtml(match.data || "")}" data-season-schedule-field="data" data-division="${division}" data-round-index="${round.rodada - 1}" data-match-index="${matchIndex}" ${adminEditMode ? "" : "disabled"}></label><label><span>Horário</span><input class="admin-input" type="time" value="${escapeHtml(match.hora || "19:00")}" data-season-schedule-field="hora" data-division="${division}" data-round-index="${round.rodada - 1}" data-match-index="${matchIndex}" ${adminEditMode ? "" : "disabled"}></label>${renderHistoricalMatchResult(division, round.rodada - 1, matchIndex, match)}</div></div>`).join("")}
     ${round.folga ? `<small class="admin-season-bye"><i class="bi bi-pause-circle"></i> Folga: ${escapeHtml(playerName(division, round.folga))}</small>` : ""}
   </section>`;
+}
+
+function renderHistoricalMatchResult(division, roundIndex, matchIndex, match) {
+  if (seasonDraft.modo !== "LEGADA") return "";
+  const option = (value, selected) => `<option value="${value}" ${String(selected) === String(value) ? "selected" : ""}>${value}</option>`;
+  const attributes = `data-division="${division}" data-round-index="${roundIndex}" data-match-index="${matchIndex}" ${adminEditMode ? "" : "disabled"}`;
+  return `<label><span>Placar</span><div class="admin-season-history-score"><select class="admin-select" data-season-schedule-field="placar1" ${attributes}>${["-",0,1,2].map((value) => option(value, match.placar1 ?? "-")).join("")}</select><b>×</b><select class="admin-select" data-season-schedule-field="placar2" ${attributes}>${["-",0,1,2].map((value) => option(value, match.placar2 ?? "-")).join("")}</select></div></label><label><span>Status</span><span class="admin-season-history-status"><i class="bi bi-check-circle"></i> Encerrada</span></label>`;
 }
 
 function getCommonSeasonRoundValue(round, field) {
@@ -676,7 +723,13 @@ function updateSeasonScheduleField(event) {
     ?.[Number(input.dataset.roundIndex)]
     ?.partidas[Number(input.dataset.matchIndex)];
   if (!match) return;
-  match[input.dataset.seasonScheduleField] = input.value;
+  const field = input.dataset.seasonScheduleField;
+  match[field] = input.value;
+  if (field === "status" && input.value === "A") {
+    match.placar1 = "-";
+    match.placar2 = "-";
+    renderSeasonEditor();
+  }
   updateSeasonRoundControls(input.dataset.division, Number(input.dataset.roundIndex));
   getPage()?.querySelector("[data-season-editor]")?.classList.toggle("is-dirty", isSeasonDirty());
 }
@@ -909,6 +962,9 @@ function isSeasonDirty() {
             Number(match.numero2),
             match.data || "",
             match.hora || "",
+            match.status || "A",
+            String(match.placar1 ?? "-"),
+            String(match.placar2 ?? "-"),
           ]),
         ],
       ),
@@ -962,10 +1018,18 @@ async function saveSeasonChanges() {
   syncSeasonDraftFromEditor();
   const ids = [...seasonDraft.participantes.A, ...seasonDraft.participantes.B].map((item) => item.jogador_id);
   if (new Set(ids).size !== ids.length) return showAdminModal("Jogador duplicado", "Cada jogador pode ocupar somente uma vaga na temporada.", "error");
-  const confirmed = await confirmAdminChange("Salvar preparação?", `A temporada ${seasonDraft.temporada} será salva sem alterar a temporada atual.`);
+  const legacy = seasonDraft.modo === "LEGADA";
+  const confirmed = await confirmAdminChange(
+    legacy ? "Salvar rascunho histórico?" : "Salvar preparação?",
+    legacy
+      ? `O cadastro de ${seasonDraft.temporada} será salvo como rascunho e ainda não aparecerá no Histórico.`
+      : `A temporada ${seasonDraft.temporada} será salva sem alterar a temporada atual.`,
+  );
   if (!confirmed) return;
   try {
-    const data = await saveAdminTemporada(
+    const savedYear = seasonDraft.temporada;
+    const save = legacy ? saveAdminTemporadaLegada : saveAdminTemporada;
+    const data = await save(
       activeAdminSession.token,
       seasonDraft.temporada,
       seasonDraft.participantes,
@@ -973,10 +1037,41 @@ async function saveSeasonChanges() {
     );
     setSeasonDraft(data);
     await loadAdminSeasons();
-    showAdminModal("Temporada salva", "A preparação foi salva e poderá ser retomada em outra sessão.", "success");
+    showAdminModal(
+      legacy ? "Rascunho histórico salvo" : "Temporada salva",
+      legacy
+        ? `O cadastro de ${savedYear} foi salvo e ainda não está publicado no Histórico.`
+        : "A preparação foi salva e poderá ser retomada em outra sessão.",
+      "success",
+    );
   } catch (error) {
     showAdminModal("Não foi possível salvar", error.message, "error");
   }
+}
+
+function findInvalidHistoricalResult() {
+  const schedules = getEffectiveSeasonSchedules();
+  for (const division of ["A", "B"]) {
+    for (const round of schedules[division]) {
+      for (let index = 0; index < round.partidas.length; index += 1) {
+        const match = round.partidas[index];
+        const score1 = Number(match.placar1);
+        const score2 = Number(match.placar2);
+        const validScores = [score1, score2].every(
+          (score) => Number.isInteger(score) && score >= 0 && score <= 2,
+        );
+        if (
+          match.status !== "E" ||
+          !validScores ||
+          [score1, score2].filter((score) => score === 2).length !== 1 ||
+          score1 === score2
+        ) {
+          return { division, round: round.rodada, match: index + 1 };
+        }
+      }
+    }
+  }
+  return null;
 }
 
 async function deleteSeasonDraft() {
@@ -994,28 +1089,45 @@ async function deleteSeasonDraft() {
 
 async function activateSeasonDraft() {
   if (isSeasonDirty()) {
+    const legacy = seasonDraft.modo === "LEGADA";
     showAdminModal(
       "Existem alterações não salvas",
-      "Salve ou cancele as alterações antes de ativar esta temporada.",
+      `Salve ou cancele as alterações antes de ${legacy ? "publicar" : "ativar"} esta temporada.`,
       "error",
     );
     return;
   }
+  const legacy = seasonDraft.modo === "LEGADA";
+  if (legacy) {
+    const invalidResult = findInvalidHistoricalResult();
+    if (invalidResult) {
+      showAdminModal(
+        "Resultado histórico incompleto",
+        `Confira a Série ${invalidResult.division}, rodada ${invalidResult.round}, partida ${invalidResult.match}. Uma partida encerrada deve ter exatamente um vencedor com 2 pontos.`,
+        "error",
+      );
+      return;
+    }
+  }
   const confirmed = await confirmAdminChange(
-    "Ativar nova temporada?",
-    `A temporada ${seasonDraft.temporada} substituirá a temporada atual. Participantes, rodadas e jogadores ativos serão atualizados. Esta ação não poderá ser desfeita.`,
+    legacy ? "Publicar temporada passada?" : "Ativar nova temporada?",
+    legacy
+      ? `A temporada ${seasonDraft.temporada} será publicada no Histórico. A temporada atual não será alterada.`
+      : `A temporada ${seasonDraft.temporada} substituirá a temporada atual. Participantes, rodadas e jogadores ativos serão atualizados. Esta ação não poderá ser desfeita.`,
   );
   if (!confirmed) return;
 
   const button = getPage()?.querySelector("[data-activate-season]");
   if (button) {
     button.disabled = true;
-    button.innerHTML = '<span class="loading-spinner loading-spinner-inline" aria-hidden="true"></span> Ativando...';
+    button.innerHTML = `<span class="loading-spinner loading-spinner-inline" aria-hidden="true"></span> ${legacy ? "Publicando..." : "Ativando..."}`;
   }
   try {
     const temporada = seasonDraft.temporada;
-    const activation = await activateAdminTemporada(activeAdminSession.token, temporada);
-    setKnownCurrentSeason(activation.temporada_atual || temporada);
+    const activation = legacy
+      ? await publishAdminTemporadaLegada(activeAdminSession.token, temporada)
+      : await activateAdminTemporada(activeAdminSession.token, temporada);
+    if (!legacy) setKnownCurrentSeason(activation.temporada_atual || temporada);
     temporaryActivePlayers = new Map();
     closeSeasonEditor();
     const page = getPage();
@@ -1025,15 +1137,17 @@ async function activateSeasonDraft() {
     }
     await loadAdminSeasons();
     showAdminModal(
-      "Temporada ativada",
-      `A temporada ${temporada} agora é a temporada atual do campeonato.`,
+      legacy ? "Temporada publicada" : "Temporada ativada",
+      legacy
+        ? `A temporada ${temporada} agora está disponível no Histórico.`
+        : `A temporada ${temporada} agora é a temporada atual do campeonato.`,
       "success",
     );
   } catch (error) {
-    showAdminModal("Não foi possível ativar", error.message, "error");
+    showAdminModal(legacy ? "Não foi possível publicar" : "Não foi possível ativar", error.message, "error");
     if (button?.isConnected) {
       button.disabled = false;
-      button.textContent = "Ativar temporada";
+      button.textContent = legacy ? "Publicar" : "Ativar temporada";
     }
   }
 }
@@ -1048,6 +1162,8 @@ function closeSeasonEditor() {
     create.innerHTML = CREATE_SEASON_BUTTON_HTML;
     create.disabled = false;
   }
+  const createLegacy = getPage()?.querySelector("[data-create-legacy-season]");
+  if (createLegacy) createLegacy.disabled = false;
 }
 
 function refreshSeasonDraftPlayers(players) {
