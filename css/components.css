@@ -990,10 +990,21 @@
 .admin-season-create { margin:14px 0; display:flex; align-items:end; gap:12px; }
 .admin-season-create label { flex:1; display:flex; flex-direction:column; gap:5px; color:var(--text-muted); font-size:.75rem; }
 .admin-season-create-legacy { margin-top:-6px; padding-top:14px; border-top:1px dashed var(--border); }
-.admin-season-create-legacy .admin-input { width:100%; }
+.admin-season-create-legacy .admin-select { width:100%; }
 .admin-season-import-actions { display:flex; flex-wrap:wrap; gap:8px; }
-.admin-season-import-actions .btn { white-space:nowrap; }
+.admin-season-import-actions .btn { box-sizing:border-box; min-width:0; padding-right:14px; padding-left:14px; display:inline-flex; align-items:center; justify-content:center; gap:7px; line-height:1.2; text-align:center; white-space:nowrap; }
+.admin-season-import-actions .btn i { flex:0 0 auto; margin:0; }
 .admin-season-import-note { margin:-6px 0 16px; color:var(--text-muted); font-size:.72rem; }
+
+@media (max-width: 720px) {
+  .admin-season-create-legacy { display:grid; grid-template-columns:minmax(0,1fr); align-items:stretch; }
+  .admin-season-import-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .admin-season-import-actions .btn { width:100%; min-width:0; }
+}
+
+@media (max-width: 500px) {
+  .admin-season-import-actions { grid-template-columns:minmax(0,1fr); }
+}
 .loading-spinner-inline { width:16px; height:16px; margin:0 6px 0 0; display:inline-block; vertical-align:middle; }
 .admin-season-summary { margin-bottom:8px; padding:12px; display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:12px; border:1px solid var(--border); border-radius:10px; background:var(--group-bg); }
 .admin-season-summary.is-current { border-left:3px solid #22c55e; }

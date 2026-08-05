@@ -307,7 +307,7 @@ function renderDashboard(session) {
           <button class="btn" type="button" data-create-season>${CREATE_SEASON_BUTTON_HTML}</button>
         </div>
         <div class="admin-season-create admin-season-create-legacy">
-          <label><span>Ano da temporada passada</span><input class="admin-input" type="number" min="1900" data-season-legacy-year></label>
+          <label><span>Ano da temporada passada</span><select class="admin-select" data-season-legacy-year></select></label>
           <div class="admin-season-import-actions">
             <a class="btn btn-admin-secondary" href="${withBasePath("/assets/templates/modelo-temporada-historica.xlsx")}" download><i class="bi bi-file-earmark-arrow-down"></i> Baixar modelo</a>
             <input type="file" accept=".xlsx" data-season-legacy-file hidden>
@@ -468,14 +468,17 @@ function renderSeasonList(data) {
     .map((year) => `<option value="${year}">${year}</option>`).join("");
   page.querySelector("[data-create-season]").disabled = !yearSelect.value || Boolean(seasonDraft);
   if (legacyYear) {
-    legacyYear.max = String(Number(data.temporada_atual) - 1);
-    let suggestedLegacyYear = Number(data.temporada_atual) - 1;
-    while (used.has(suggestedLegacyYear) && suggestedLegacyYear >= 1900) {
-      suggestedLegacyYear -= 1;
+    const availableLegacyYears = [];
+    let candidate = Number(data.temporada_atual) - 1;
+    while (availableLegacyYears.length < 5 && candidate >= 1900) {
+      if (!used.has(candidate)) availableLegacyYears.push(candidate);
+      candidate -= 1;
     }
-    legacyYear.value = suggestedLegacyYear >= 1900 ? String(suggestedLegacyYear) : "";
+    legacyYear.innerHTML = availableLegacyYears
+      .map((year) => `<option value="${year}">${year}</option>`)
+      .join("");
   }
-  page.querySelector("[data-create-legacy-season]").disabled = Boolean(seasonDraft);
+  page.querySelector("[data-create-legacy-season]").disabled = !legacyYear?.value || Boolean(seasonDraft);
   container.querySelectorAll("[data-edit-season]").forEach((button) => button.addEventListener("click", () => openSavedSeason(Number(button.dataset.editSeason))));
 }
 
