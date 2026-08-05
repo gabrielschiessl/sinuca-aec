@@ -991,6 +991,9 @@
 .admin-season-create label { flex:1; display:flex; flex-direction:column; gap:5px; color:var(--text-muted); font-size:.75rem; }
 .admin-season-create-legacy { margin-top:-6px; padding-top:14px; border-top:1px dashed var(--border); }
 .admin-season-create-legacy .admin-input { width:100%; }
+.admin-season-import-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.admin-season-import-actions .btn { white-space:nowrap; }
+.admin-season-import-note { margin:-6px 0 16px; color:var(--text-muted); font-size:.72rem; }
 .loading-spinner-inline { width:16px; height:16px; margin:0 6px 0 0; display:inline-block; vertical-align:middle; }
 .admin-season-summary { margin-bottom:8px; padding:12px; display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:12px; border:1px solid var(--border); border-radius:10px; background:var(--group-bg); }
 .admin-season-summary.is-current { border-left:3px solid #22c55e; }

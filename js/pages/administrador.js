@@ -23,7 +23,7 @@ import {
   saveAdminTemporada,
   saveAdminTemporadaLegada,
 } from "../api.js";
-import { setKnownCurrentSeason } from "../config.js";
+import { setKnownCurrentSeason, withBasePath } from "../config.js";
 
 const PAGE_ID = "admin-page";
 const CREATE_SEASON_BUTTON_HTML = '<i class="bi bi-plus-circle"></i> Criar temporada';
@@ -35,6 +35,7 @@ let playerSearchMediaHandler = null;
 let seasonDraft = null;
 let savedSeasonDraft = null;
 let searchablePlayerSelectsBound = false;
+let xlsxLibraryPromise = null;
 
 window.addEventListener("beforeunload", (event) => {
   if (!isSeasonDirty()) return;
@@ -307,8 +308,13 @@ function renderDashboard(session) {
         </div>
         <div class="admin-season-create admin-season-create-legacy">
           <label><span>Ano da temporada passada</span><input class="admin-input" type="number" min="1900" data-season-legacy-year></label>
-          <button class="btn btn-admin-secondary" type="button" data-create-legacy-season><i class="bi bi-archive"></i> Cadastrar temporada passada</button>
+          <div class="admin-season-import-actions">
+            <a class="btn btn-admin-secondary" href="${withBasePath("/assets/templates/modelo-temporada-historica.xlsx")}" download><i class="bi bi-file-earmark-arrow-down"></i> Baixar modelo</a>
+            <input type="file" accept=".xlsx" data-season-legacy-file hidden>
+            <button class="btn btn-admin-secondary" type="button" data-create-legacy-season><i class="bi bi-file-earmark-arrow-up"></i> Importar planilha</button>
+          </div>
         </div>
+        <p class="admin-season-import-note">A temporada passada somente será enviada ao sistema depois da importação, revisão e confirmação em <strong>Salvar rascunho</strong>.</p>
         <div data-season-editor hidden></div>
       </section>
 
@@ -331,7 +337,8 @@ function renderDashboard(session) {
   page.querySelector("[data-player-division-filter]")?.addEventListener("change", applyAdminPlayerFilters);
   page.querySelector("[data-player-search-filter]")?.addEventListener("input", applyAdminPlayerFilters);
   page.querySelector("[data-create-season]")?.addEventListener("click", createSeasonDraft);
-  page.querySelector("[data-create-legacy-season]")?.addEventListener("click", createLegacySeasonDraft);
+  page.querySelector("[data-create-legacy-season]")?.addEventListener("click", selectLegacySeasonSpreadsheet);
+  page.querySelector("[data-season-legacy-file]")?.addEventListener("change", importLegacySeasonSpreadsheet);
   loadAdminMatches("A", false);
 }
 
@@ -472,22 +479,203 @@ function renderSeasonList(data) {
   container.querySelectorAll("[data-edit-season]").forEach((button) => button.addEventListener("click", () => openSavedSeason(Number(button.dataset.editSeason))));
 }
 
-async function createLegacySeasonDraft() {
+function selectLegacySeasonSpreadsheet() {
   if (!adminEditMode) {
-    showAdminModal("Ative o modo de edição", "Para cadastrar uma temporada passada, primeiro ative o modo de edição.", "error");
+    showAdminModal("Ative o modo de edição", "Para importar uma temporada passada, primeiro ative o modo de edição.", "error");
     return;
   }
   const year = Number(getPage()?.querySelector("[data-season-legacy-year]")?.value);
-  if (!year) return;
-  const button = getPage()?.querySelector("[data-create-legacy-season]");
-  if (button) button.disabled = true;
-  try {
-    setSeasonDraft(await prepareAdminTemporadaLegada(activeAdminSession.token, year));
-  } catch (error) {
-    showAdminModal("Não foi possível iniciar o cadastro", error.message, "error");
-  } finally {
-    if (button) button.disabled = Boolean(seasonDraft);
+  if (!year) {
+    showAdminModal("Informe o ano", "Escolha o ano da temporada passada antes de selecionar a planilha.", "error");
+    return;
   }
+  getPage()?.querySelector("[data-season-legacy-file]")?.click();
+}
+
+async function importLegacySeasonSpreadsheet(event) {
+  const file = event.currentTarget.files?.[0];
+  event.currentTarget.value = "";
+  if (!file) return;
+  const year = Number(getPage()?.querySelector("[data-season-legacy-year]")?.value);
+  const button = getPage()?.querySelector("[data-create-legacy-season]");
+  if (button) {
+    button.disabled = true;
+    button.innerHTML = '<span class="loading-spinner loading-spinner-inline" aria-hidden="true"></span> Importando...';
+  }
+  try {
+    const base = await prepareAdminTemporadaLegada(activeAdminSession.token, year);
+    const imported = await readLegacySeasonSpreadsheet(file, base.jogadores || []);
+    setSeasonDraft({
+      ...base,
+      persistida: false,
+      modo: "LEGADA",
+      participantes: imported.participantes,
+      rodadas: imported.rodadas,
+    });
+    showAdminModal(
+      "Planilha importada",
+      `Os dados de ${year} foram carregados somente para revisão. Confira participantes, datas, horários e placares antes de salvar o rascunho.`,
+      "success",
+    );
+  } catch (error) {
+    showAdminModal("Não foi possível importar", error.message, "error");
+  } finally {
+    if (button) {
+      button.disabled = Boolean(seasonDraft);
+      button.innerHTML = '<i class="bi bi-file-earmark-arrow-up"></i> Importar planilha';
+    }
+  }
+}
+
+async function readLegacySeasonSpreadsheet(file, players) {
+  const XLSX = await loadXlsxLibrary();
+  const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+  const participantRows = getImportedSheetRows(XLSX, workbook, "Participantes");
+  const matchRows = getImportedSheetRows(XLSX, workbook, "Partidas");
+  if (!participantRows.length) throw new Error("A aba Participantes está vazia.");
+  if (!matchRows.length) throw new Error("A aba Partidas está vazia.");
+
+  const participantes = { A: [], B: [] };
+  const usedPlayers = new Set();
+  participantRows.forEach((row, index) => {
+    const division = String(row.divisao || "").trim().toUpperCase();
+    const number = Number(row.numero);
+    if (!participantes[division]) throw new Error(`Participantes, linha ${index + 2}: informe divisão A ou B.`);
+    if (!Number.isInteger(number) || number < 1) throw new Error(`Participantes, linha ${index + 2}: número inválido.`);
+    const player = resolveImportedPlayer(row, players, index + 2);
+    if (usedPlayers.has(Number(player.id))) throw new Error(`O jogador ${player.exibicao} aparece mais de uma vez em Participantes.`);
+    usedPlayers.add(Number(player.id));
+    participantes[division].push({ divisao: division, numero: number, jogador_id: Number(player.id) });
+  });
+  ["A", "B"].forEach((division) => {
+    participantes[division].sort((a, b) => a.numero - b.numero);
+    participantes[division].forEach((participant, index) => {
+      if (participant.numero !== index + 1) throw new Error(`Na Série ${division}, os participantes devem ser numerados em sequência a partir de 1.`);
+    });
+  });
+  if (participantes.A.length !== 20) throw new Error("A aba Participantes deve conter exatamente 20 jogadores na Série A.");
+  if (participantes.B.length < 2) throw new Error("A aba Participantes deve conter pelo menos 2 jogadores na Série B.");
+
+  const roundMaps = { A: new Map(), B: new Map() };
+  matchRows.forEach((row, index) => {
+    const line = index + 2;
+    const division = String(row.divisao || "").trim().toUpperCase();
+    const roundNumber = Number(row.rodada);
+    const number1 = Number(row.numero1);
+    const number2 = Number(row.numero2);
+    if (!roundMaps[division]) throw new Error(`Partidas, linha ${line}: informe divisão A ou B.`);
+    if (!Number.isInteger(roundNumber) || roundNumber < 1) throw new Error(`Partidas, linha ${line}: rodada inválida.`);
+    const participantNumbers = new Set(participantes[division].map((item) => item.numero));
+    if (!participantNumbers.has(number1) || !participantNumbers.has(number2) || number1 === number2) {
+      throw new Error(`Partidas, linha ${line}: os números dos jogadores são inválidos.`);
+    }
+    const placar1 = normalizeImportedScore(row.placar1, line);
+    const placar2 = normalizeImportedScore(row.placar2, line);
+    if (!roundMaps[division].has(roundNumber)) {
+      roundMaps[division].set(roundNumber, { rodada: roundNumber, tipo: "REGULAR", folga: null, partidas: [] });
+    }
+    roundMaps[division].get(roundNumber).partidas.push({
+      numero1: number1,
+      numero2: number2,
+      data: normalizeImportedDate(row.data, line),
+      hora: normalizeImportedTime(row.hora, line),
+      status: "E",
+      placar1,
+      placar2,
+    });
+  });
+
+  const rodadas = { A: [], B: [] };
+  ["A", "B"].forEach((division) => {
+    rodadas[division] = [...roundMaps[division].values()].sort((a, b) => a.rodada - b.rodada);
+    rodadas[division].forEach((round, index) => {
+      if (round.rodada !== index + 1) throw new Error(`As rodadas da Série ${division} devem ser numeradas em sequência a partir de 1.`);
+      const used = new Set(round.partidas.flatMap((match) => [match.numero1, match.numero2]));
+      if (used.size !== round.partidas.length * 2) throw new Error(`Um participante aparece duas vezes na rodada ${round.rodada} da Série ${division}.`);
+      if (participantes[division].length % 2 === 1) {
+        round.folga = participantes[division].find((item) => !used.has(item.numero))?.numero || null;
+      }
+    });
+  });
+  return { participantes, rodadas };
+}
+
+function getImportedSheetRows(XLSX, workbook, expectedName) {
+  const sheetName = workbook.SheetNames.find(
+    (name) => normalizeImportedText(name) === normalizeImportedText(expectedName),
+  );
+  if (!sheetName) throw new Error(`A planilha não contém a aba ${expectedName}. Use o modelo disponibilizado pelo sistema.`);
+  return XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "", raw: true })
+    .map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [normalizeImportedText(key), value])))
+    .filter((row) => Object.values(row).some((value) => String(value ?? "").trim() !== ""));
+}
+
+function resolveImportedPlayer(row, players, line) {
+  const informedId = Number(row.jogador_id);
+  if (Number.isInteger(informedId) && informedId > 0) {
+    const player = players.find((item) => Number(item.id) === informedId);
+    if (!player) throw new Error(`Participantes, linha ${line}: jogador_id ${informedId} não foi encontrado.`);
+    return player;
+  }
+  const informedName = normalizeImportedText(row.jogador);
+  if (!informedName) throw new Error(`Participantes, linha ${line}: informe jogador_id ou jogador.`);
+  const matches = players.filter((player) =>
+    [player.exibicao, player.nome, player.apelido].some((value) => normalizeImportedText(value) === informedName),
+  );
+  if (matches.length !== 1) {
+    throw new Error(matches.length ? `Participantes, linha ${line}: o nome ${row.jogador} é ambíguo; use jogador_id.` : `Participantes, linha ${line}: jogador ${row.jogador} não foi encontrado.`);
+  }
+  return matches[0];
+}
+
+function normalizeImportedText(value) {
+  return String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "_");
+}
+
+function normalizeImportedScore(value, line) {
+  if (value === "" || value === null || value === undefined || value === "-") return "-";
+  const score = Number(value);
+  if (!Number.isInteger(score) || score < 0 || score > 2) throw new Error(`Partidas, linha ${line}: placar inválido.`);
+  return String(score);
+}
+
+function normalizeImportedDate(value, line) {
+  if (value === "" || value === null || value === undefined) return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}-${String(value.getUTCDate()).padStart(2, "0")}`;
+  }
+  const text = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const brazilian = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (brazilian) return `${brazilian[3]}-${brazilian[2].padStart(2, "0")}-${brazilian[1].padStart(2, "0")}`;
+  throw new Error(`Partidas, linha ${line}: data inválida.`);
+}
+
+function normalizeImportedTime(value, line) {
+  if (value === "" || value === null || value === undefined) return "19:00";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return `${String(value.getUTCHours()).padStart(2, "0")}:${String(value.getUTCMinutes()).padStart(2, "0")}`;
+  }
+  if (typeof value === "number" && value >= 0 && value < 1) {
+    const minutes = Math.round(value * 24 * 60) % (24 * 60);
+    return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  }
+  const match = String(value).trim().match(/^([01]?\d|2[0-3]):([0-5]\d)/);
+  if (match) return `${match[1].padStart(2, "0")}:${match[2]}`;
+  throw new Error(`Partidas, linha ${line}: horário inválido.`);
+}
+
+function loadXlsxLibrary() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (xlsxLibraryPromise) return xlsxLibraryPromise;
+  xlsxLibraryPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
+    script.onload = () => resolve(window.XLSX);
+    script.onerror = () => reject(new Error("Não foi possível carregar o leitor de planilhas. Verifique sua conexão e tente novamente."));
+    document.head.appendChild(script);
+  });
+  return xlsxLibraryPromise;
 }
 
 async function createSeasonDraft() {

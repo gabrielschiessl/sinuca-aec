@@ -118,7 +118,7 @@ Após uma alteração confirmada, o sistema deve atualizar:
 
 1. Cadastro manual de temporadas históricas, com participantes, chaveamento,
    datas, horários, placares e resultados.
-2. Importação opcional por planilha para temporadas históricas e para os fluxos
+2. Importação por planilha para temporadas históricas e opcional para os fluxos
    equivalentes da temporada atual, sempre com validação e prévia antes de
    gravar.
 3. Edição administrativa de partidas, datas e horários das rodadas da temporada
@@ -140,8 +140,9 @@ Após uma alteração confirmada, o sistema deve atualizar:
 
 ### Modelo para importação por planilha
 
-- A importação será uma alternativa ao preenchimento manual, não uma etapa
-  obrigatória.
+- Para temporadas históricas, a planilha será a entrada obrigatória. Após a
+  importação, os dados serão revisados e poderão ser editados no mesmo editor
+  usado pelos rascunhos antes de qualquer gravação ou publicação.
 - Ao escolher “Importar planilha”, o administrador verá as orientações e um
   botão para baixar um arquivo `.xlsx` de exemplo.
 - O modelo terá abas, cabeçalhos, formatos e exemplos compatíveis exatamente
