@@ -508,6 +508,7 @@ async function importLegacySeasonSpreadsheet(event) {
   try {
     const base = await prepareAdminTemporadaLegada(activeAdminSession.token, year);
     const imported = await readLegacySeasonSpreadsheet(file, base.jogadores || []);
+    if (!imported) return;
     setSeasonDraft({
       ...base,
       persistida: false,
@@ -556,8 +557,15 @@ async function readLegacySeasonSpreadsheet(file, players) {
       if (participant.numero !== index + 1) throw new Error(`Na Série ${division}, os participantes devem ser numerados em sequência a partir de 1.`);
     });
   });
-  if (participantes.A.length !== 20) throw new Error("A aba Participantes deve conter exatamente 20 jogadores na Série A.");
-  if (participantes.B.length < 2) throw new Error("A aba Participantes deve conter pelo menos 2 jogadores na Série B.");
+  if (participantes.A.length < 2) throw new Error("A aba Participantes deve conter pelo menos 2 jogadores na Série A.");
+  if (participantes.B.length === 1) throw new Error("Quando informada, a Série B deve conter pelo menos 2 jogadores.");
+  if (!participantes.B.length) {
+    const confirmed = await confirmAdminChange(
+      "Temporada sem Série B?",
+      "A planilha não possui participantes da Série B. Confirma que esta temporada teve somente a Série A?",
+    );
+    if (!confirmed) return null;
+  }
 
   const roundMaps = { A: new Map(), B: new Map() };
   matchRows.forEach((row, index) => {
@@ -595,8 +603,14 @@ async function readLegacySeasonSpreadsheet(file, players) {
       if (round.rodada !== index + 1) throw new Error(`As rodadas da Série ${division} devem ser numeradas em sequência a partir de 1.`);
       const used = new Set(round.partidas.flatMap((match) => [match.numero1, match.numero2]));
       if (used.size !== round.partidas.length * 2) throw new Error(`Um participante aparece duas vezes na rodada ${round.rodada} da Série ${division}.`);
+      const expectedPlayers = participantes[division].length - (participantes[division].length % 2);
+      if (used.size !== expectedPlayers) {
+        throw new Error(`A rodada ${round.rodada} da Série ${division} não contém a quantidade esperada de participantes.`);
+      }
       if (participantes[division].length % 2 === 1) {
-        round.folga = participantes[division].find((item) => !used.has(item.numero))?.numero || null;
+        const absent = participantes[division].filter((item) => !used.has(item.numero));
+        if (absent.length !== 1) throw new Error(`A rodada ${round.rodada} da Série ${division} deve possuir exatamente uma folga.`);
+        round.folga = absent[0].numero;
       }
     });
   });
@@ -744,8 +758,8 @@ function renderSeasonEditor() {
   editor.innerHTML = `
     <div class="admin-season-editor-heading"><div><strong>Temporada ${seasonDraft.temporada}</strong><span>${seasonDraft.modo === "LEGADA" ? seasonDraft.persistida ? "Rascunho histórico salvo" : "Cadastro de temporada passada" : seasonDraft.persistida ? "Preparação salva" : "Novo rascunho não salvo"}</span></div>${seasonDraft.persistida ? `<div class="admin-season-editor-controls"><button class="btn" type="button" data-activate-season>${seasonDraft.modo === "LEGADA" ? "Publicar" : "Ativar temporada"}</button><button class="btn btn-admin-danger" type="button" data-delete-season>Excluir temporada</button></div>` : ""}</div>
     <div class="admin-season-divisions">
-      <section><h3>Série A <small>20 participantes</small></h3><div data-season-list="A">${rows("A")}</div></section>
-      <section><h3>Série B <small>${seasonDraft.participantes.B.length} participantes</small></h3><div data-season-list="B">${rows("B")}</div><button class="btn btn-admin-secondary admin-season-add" type="button" data-add-season-player ${adminEditMode ? "" : "disabled"}><i class="bi bi-person-plus"></i> Adicionar participante</button></section>
+      <section><h3>Série A <small>${seasonDraft.participantes.A.length} participantes</small></h3><div data-season-list="A">${rows("A")}</div></section>
+      <section><h3>Série B <small>${seasonDraft.participantes.B.length} participantes${seasonDraft.modo === "LEGADA" ? " (opcional)" : ""}</small></h3><div data-season-list="B">${rows("B")}</div><button class="btn btn-admin-secondary admin-season-add" type="button" data-add-season-player ${adminEditMode ? "" : "disabled"}><i class="bi bi-person-plus"></i> Adicionar participante</button></section>
     </div>
     ${renderSeasonSchedulePreview()}
     <div class="admin-season-actions"><button class="btn btn-admin-secondary" type="button" data-cancel-season>Cancelar alterações</button><button class="btn" type="button" data-save-season ${adminEditMode ? "" : "disabled"}>${seasonDraft.modo === "LEGADA" ? "Salvar rascunho" : "Salvar temporada"}</button></div>`;
@@ -1035,7 +1049,7 @@ function buildSeasonSchedules(participants) {
 
 function getEffectiveSeasonSchedules() {
   const schedules = seasonDraft.rodadas;
-  if (schedules?.A?.length && schedules?.B?.length) return schedules;
+  if (Array.isArray(schedules?.A) && Array.isArray(schedules?.B)) return schedules;
   return buildSeasonSchedules(seasonDraft.participantes);
 }
 
@@ -1179,7 +1193,7 @@ function addSeasonPlayer() {
 }
 
 function removeSeasonPlayer(event) {
-  if (seasonDraft.participantes.B.length <= 2) return showAdminModal("Mínimo de participantes", "A Série B deve possuir ao menos 2 participantes.", "error");
+  if (seasonDraft.modo !== "LEGADA" && seasonDraft.participantes.B.length <= 2) return showAdminModal("Mínimo de participantes", "A Série B deve possuir ao menos 2 participantes.", "error");
   const row = event.currentTarget.closest("[data-season-participant]");
   const rows = [...row.parentElement.children];
   seasonDraft.participantes.B.splice(rows.indexOf(row), 1);

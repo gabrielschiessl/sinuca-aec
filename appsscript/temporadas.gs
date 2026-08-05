@@ -164,8 +164,8 @@ function salvarTemporadaLegada(dados) {
 }
 
 function normalizarRascunhoTemporadaLegada(dados) {
-  const participantes = validarParticipantesTemporada(dados.participantes);
-  const rodadasValidadas = validarRodadasTemporadaInformadas(dados.rodadas, participantes);
+  const participantes = validarParticipantesTemporadaLegada(dados.participantes);
+  const rodadasValidadas = validarRodadasTemporadaLegada(dados.rodadas, participantes);
   const placaresPermitidos = new Set(["-", "0", "1", "2"]);
   const rodadas = ["A", "B"].reduce((resultado, divisao) => {
     resultado[divisao] = rodadasValidadas[divisao].map((rodada, indiceRodada) => ({
@@ -186,8 +186,8 @@ function normalizarRascunhoTemporadaLegada(dados) {
 }
 
 function validarConteudoTemporadaLegada(dados) {
-  const participantes = validarParticipantesTemporada(dados.participantes);
-  const rodadasValidadas = validarRodadasTemporadaInformadas(dados.rodadas, participantes);
+  const participantes = validarParticipantesTemporadaLegada(dados.participantes);
+  const rodadasValidadas = validarRodadasTemporadaLegada(dados.rodadas, participantes);
   const rodadas = ["A", "B"].reduce((resultado, divisao) => {
     resultado[divisao] = rodadasValidadas[divisao].map((rodada, indiceRodada) => ({
       ...rodada,
@@ -912,6 +912,32 @@ function validarParticipantesTemporada(valor) {
   return resultado;
 }
 
+function validarParticipantesTemporadaLegada(valor) {
+  const participantes = valor || {};
+  const resultado = { A: [], B: [] };
+  const jogadoresExistentes = new Set(getJogadores().map((jogador) => jogador.id));
+
+  ["A", "B"].forEach((divisao) => {
+    const lista = Array.isArray(participantes[divisao]) ? participantes[divisao] : [];
+    resultado[divisao] = lista.map((item) => ({ jogador_id: Number(item.jogador_id) }));
+    if (resultado[divisao].some((item) => !jogadoresExistentes.has(item.jogador_id))) {
+      throw new Error(`A Série ${divisao} possui um jogador inválido.`);
+    }
+  });
+
+  if (resultado.A.length < 2) {
+    throw new Error("A Série A deve possuir pelo menos 2 participantes.");
+  }
+  if (resultado.B.length === 1) {
+    throw new Error("Quando informada, a Série B deve possuir pelo menos 2 participantes.");
+  }
+  const ids = [...resultado.A, ...resultado.B].map((item) => item.jogador_id);
+  if (new Set(ids).size !== ids.length) {
+    throw new Error("Um jogador não pode participar de duas vagas na mesma temporada.");
+  }
+  return resultado;
+}
+
 function gerarChaveamentoTemporada(participantes) {
   const resultado = {};
   ["A", "B"].forEach((divisao) => {
@@ -1030,7 +1056,7 @@ function padronizarFolgasSerieB(rodadas, numeros) {
   }));
 }
 
-function validarChaveamentoTodosContraTodos(rodadas, numeros, divisao) {
+function validarChaveamentoTodosContraTodos(rodadas, numeros, divisao, exigirFolgaNumeradaSerieB = true) {
   const jogadores = new Set(numeros.map(Number));
   const confrontos = new Set();
   rodadas.forEach((rodada) => {
@@ -1066,7 +1092,24 @@ function validarChaveamentoTodosContraTodos(rodadas, numeros, divisao) {
   ) {
     throw new Error(`A Série ${divisao} deve possuir ${totalRodadasEsperado} rodadas regulares numeradas em sequência.`);
   }
-  if (divisao === "B" && numeros.length % 2 === 1) {
+  if (numeros.length % 2 === 1) {
+    const folgas = rodadas.map((rodada) => Number(rodada.folga));
+    const folgasCorrespondemAsRodadas = rodadas.every((rodada) => {
+      const usados = new Set(
+        rodada.partidas.flatMap((partida) => [Number(partida.numero1), Number(partida.numero2)]),
+      );
+      const ausentes = numeros.filter((numero) => !usados.has(Number(numero)));
+      return ausentes.length === 1 && ausentes[0] === Number(rodada.folga);
+    });
+    if (
+      !folgasCorrespondemAsRodadas ||
+      !folgas.every((numero) => jogadores.has(numero)) ||
+      new Set(folgas).size !== numeros.length
+    ) {
+      throw new Error(`Cada participante da Série ${divisao} deve ter exatamente uma folga.`);
+    }
+  }
+  if (exigirFolgaNumeradaSerieB && divisao === "B" && numeros.length % 2 === 1) {
     const folgas = rodadas.map((rodada) => Number(rodada.folga));
     const folgasValidas = folgas.every(
       (numero, indice) => numero === indice + 1 && jogadores.has(numero),
@@ -1078,6 +1121,46 @@ function validarChaveamentoTodosContraTodos(rodadas, numeros, divisao) {
   if (confrontos.size !== totalEsperado) {
     throw new Error(`O chaveamento da Série ${divisao} não contém todos os confrontos necessários.`);
   }
+}
+
+function validarRodadasTemporadaLegada(valor, participantes) {
+  const informado = valor || {};
+  const resultado = { A: [], B: [] };
+
+  ["A", "B"].forEach((divisao) => {
+    const numeros = participantes[divisao].map((_, indice) => indice + 1);
+    const rodadas = Array.isArray(informado[divisao]) ? informado[divisao] : [];
+    if (!numeros.length) {
+      if (rodadas.some((rodada) => Array.isArray(rodada.partidas) && rodada.partidas.length)) {
+        throw new Error(`A Série ${divisao} possui partidas, mas não possui participantes.`);
+      }
+      return;
+    }
+
+    resultado[divisao] = rodadas.map((rodada, indice) => ({
+      rodada: indice + 1,
+      tipo: "REGULAR",
+      folga: null,
+      partidas: (Array.isArray(rodada.partidas) ? rodada.partidas : []).map(
+        normalizarPartidaPreparacao,
+      ),
+    }));
+
+    if (numeros.length % 2 === 1) {
+      resultado[divisao].forEach((rodada) => {
+        const usados = new Set(
+          rodada.partidas.flatMap((partida) => [partida.numero1, partida.numero2]),
+        );
+        const ausentes = numeros.filter((numero) => !usados.has(numero));
+        if (ausentes.length !== 1) {
+          throw new Error(`A rodada ${rodada.rodada} da Série ${divisao} deve possuir exatamente uma folga.`);
+        }
+        rodada.folga = ausentes[0];
+      });
+    }
+    validarChaveamentoTodosContraTodos(resultado[divisao], numeros, divisao, false);
+  });
+  return resultado;
 }
 
 function validarRodadasTemporadaInformadas(valor, participantes) {
