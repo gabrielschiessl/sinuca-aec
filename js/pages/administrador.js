@@ -398,11 +398,12 @@ function toggleAdminEditMode(event) {
       status.dataset.previousStatus = card.dataset.originalStatus;
       scores[0].value = card.dataset.originalScore1 === "-" ? "" : card.dataset.originalScore1;
       scores[1].value = card.dataset.originalScore2 === "-" ? "" : card.dataset.originalScore2;
+      card.dataset.woLoser = "";
+      setAdminMatchObservation(card, card.dataset.originalObservation || "");
     }
-    const scheduled = status?.value === "A";
     if (status) status.disabled = !adminEditMode;
     scores.forEach((score) => {
-      score.disabled = !adminEditMode || scheduled;
+      score.disabled = !adminEditMode;
     });
     const saveButton = card.querySelector("[data-save-match]");
     if (saveButton) saveButton.disabled = !adminEditMode;
@@ -1845,10 +1846,11 @@ function applyAdminMatchFilters() {
 }
 
 function renderAdminMatch(partida) {
-  const scheduled = partida.status.codigo === "A";
-  return `<article class="admin-match" data-admin-match data-round="${partida.rodada}" data-player1="${partida.jogador1.numero}" data-player2="${partida.jogador2.numero}" data-original-status="${partida.status.codigo}" data-original-score1="${partida.placar1}" data-original-score2="${partida.placar2}">
+  const observation = partida.observacao?.texto || "";
+  return `<article class="admin-match" data-admin-match data-round="${partida.rodada}" data-player1="${partida.jogador1.numero}" data-player2="${partida.jogador2.numero}" data-original-status="${partida.status.codigo}" data-original-score1="${partida.placar1}" data-original-score2="${partida.placar2}" data-original-observation="${escapeHtml(observation)}" data-wo-loser="">
     <div class="admin-match-players"><strong>${escapeHtml(partida.jogador1.exibicao)}</strong><span>×</span><strong>${escapeHtml(partida.jogador2.exibicao)}</strong></div>
-    <div class="admin-match-controls"><select class="admin-select" data-match-status ${adminEditMode ? "" : "disabled"}>${statusOption("A", "Agendada", partida.status.codigo)}${statusOption("V", "Ao vivo", partida.status.codigo)}${statusOption("E", "Encerrada", partida.status.codigo)}</select><div class="admin-score-pair">${scoreSelect(partida.placar1, scheduled)}<span>×</span>${scoreSelect(partida.placar2, scheduled)}</div><button class="btn btn-admin-save" type="button" data-save-match ${adminEditMode ? "" : "disabled"}>Salvar</button></div>
+    <div class="admin-match-controls"><select class="admin-select" data-match-status ${adminEditMode ? "" : "disabled"}>${statusOption("A", "Agendada", partida.status.codigo)}${statusOption("V", "Ao vivo", partida.status.codigo)}${statusOption("E", "Encerrada", partida.status.codigo)}</select><div class="admin-score-pair">${scoreSelect(partida.placar1)}<span>×</span>${scoreSelect(partida.placar2)}</div><button class="btn btn-admin-save" type="button" data-save-match ${adminEditMode ? "" : "disabled"}>Salvar</button></div>
+    <small class="admin-match-observation" data-match-observation ${observation ? "" : "hidden"}>${escapeHtml(observation)}</small>
   </article>`;
 }
 
@@ -1856,9 +1858,16 @@ function statusOption(value, label, selected) {
   return `<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`;
 }
 
-function scoreSelect(value, scheduled) {
+function scoreSelect(value) {
   const normalized = value === "-" ? "" : String(value);
-  return `<select class="admin-select admin-score" data-match-score ${!adminEditMode || scheduled ? "disabled" : ""}><option value="" ${normalized === "" ? "selected" : ""}>-</option>${[0, 1, 2].map((score) => `<option value="${score}" ${normalized === String(score) ? "selected" : ""}>${score}</option>`).join("")}</select>`;
+  return `<select class="admin-select admin-score" data-match-score ${adminEditMode ? "" : "disabled"}><option value="" ${normalized === "" ? "selected" : ""}>-</option>${[0, 1, 2].map((score) => `<option value="${score}" ${normalized === String(score) ? "selected" : ""}>${score}</option>`).join("")}<option value="WO">W.O.</option></select>`;
+}
+
+function setAdminMatchObservation(card, value) {
+  const observation = card.querySelector("[data-match-observation]");
+  if (!observation) return;
+  observation.textContent = value;
+  observation.hidden = !value;
 }
 
 function bindAdminMatchEvents(divisao) {
@@ -1876,7 +1885,11 @@ function bindAdminMatchEvents(divisao) {
           "O placar atual será apagado e a partida voltará para – × –.",
         );
         if (!confirmed) { status.value = previous; return; }
-        scores.forEach((score) => { score.value = ""; score.disabled = true; });
+        scores.forEach((score) => { score.value = ""; score.disabled = false; });
+        card.dataset.woLoser = "";
+        if (/^W\.O\.:/i.test(card.querySelector("[data-match-observation]")?.textContent || "")) {
+          setAdminMatchObservation(card, "");
+        }
       } else {
         scores.forEach((score) => { score.disabled = false; });
         if (previous === "A" && scores.every((score) => score.value === "")) {
@@ -1893,10 +1906,28 @@ function bindAdminMatchEvents(divisao) {
       status.dataset.previousStatus = next;
       updateCardDirtyState(card);
     });
-    scores.forEach((score) => score.addEventListener("change", () => {
+    scores.forEach((score, scoreIndex) => score.addEventListener("change", () => {
+      if (score.value === "WO") {
+        const loserName = card.querySelectorAll(".admin-match-players strong")[scoreIndex]?.textContent.trim() || "Jogador";
+        scores[scoreIndex].value = "0";
+        scores[scoreIndex === 0 ? 1 : 0].value = "2";
+        card.dataset.woLoser = scoreIndex === 0 ? card.dataset.player1 : card.dataset.player2;
+        setAdminMatchObservation(card, `W.O.: ${loserName}`);
+        status.value = "E";
+        status.dataset.previousStatus = "E";
+        updateCardDirtyState(card);
+        return;
+      }
+      if (card.dataset.woLoser || /^W\.O\.:/i.test(card.querySelector("[data-match-observation]")?.textContent || "")) {
+        card.dataset.woLoser = "";
+        setAdminMatchObservation(card, "");
+      }
       if (scores.some((item) => item.value === "2")) {
         status.value = "E";
         status.dataset.previousStatus = "E";
+      } else if (status.value === "A" && scores.some((item) => item.value !== "")) {
+        status.value = "V";
+        status.dataset.previousStatus = "V";
       }
       updateCardDirtyState(card);
     }));
@@ -1907,7 +1938,8 @@ function bindAdminMatchEvents(divisao) {
 function updateCardDirtyState(card) {
   const status = card.querySelector("[data-match-status]").value;
   const scores = [...card.querySelectorAll("[data-match-score]")].map((item) => item.value || "-");
-  const dirty = status !== card.dataset.originalStatus || scores[0] !== card.dataset.originalScore1 || scores[1] !== card.dataset.originalScore2;
+  const observation = card.querySelector("[data-match-observation]")?.textContent || "";
+  const dirty = status !== card.dataset.originalStatus || scores[0] !== card.dataset.originalScore1 || scores[1] !== card.dataset.originalScore2 || observation !== card.dataset.originalObservation;
   card.classList.toggle("is-dirty", dirty);
   const pending = getPage()?.querySelectorAll("[data-admin-match].is-dirty").length || 0;
   const label = getPage()?.querySelector("[data-admin-pending-count]");
@@ -1921,7 +1953,7 @@ function getCardChange(card, divisao) {
   const scores = [...card.querySelectorAll("[data-match-score]")].map((item) => item.value);
   const validation = validateMatchState(status, scores[0], scores[1]);
   if (validation.error) return { error: validation.error };
-  return { divisao, rodada: card.dataset.round, numero1: card.dataset.player1, numero2: card.dataset.player2, ...validation };
+  return { divisao, rodada: card.dataset.round, numero1: card.dataset.player1, numero2: card.dataset.player2, observacao: card.querySelector("[data-match-observation]")?.textContent || "", ...(card.dataset.woLoser ? { wo_perdedor: card.dataset.woLoser } : {}), ...validation };
 }
 
 async function requestSaveCards(selectedCard, divisao) {
@@ -1956,8 +1988,11 @@ async function saveCards(cards, divisao) {
       card.dataset.originalStatus = result.status;
       card.dataset.originalScore1 = String(result.placar1);
       card.dataset.originalScore2 = String(result.placar2);
+      card.dataset.originalObservation = result.observacao || "";
+      card.dataset.woLoser = "";
+      setAdminMatchObservation(card, result.observacao || "");
       card.classList.remove("is-dirty", "has-error");
-      scores.forEach((score) => { score.disabled = result.status === "A"; });
+      scores.forEach((score) => { score.disabled = !adminEditMode; });
       card.querySelector("[data-save-match]").disabled = false;
     });
     updateCardDirtyState(cards[0]);
@@ -1978,7 +2013,8 @@ function confirmAdminSave(selectedCard, dirtyCards) {
       const names = [...card.querySelectorAll(".admin-match-players strong")].map((item) => item.textContent.trim());
       const status = card.querySelector("[data-match-status] option:checked").textContent;
       const scores = [...card.querySelectorAll("[data-match-score]")].map((item) => item.value || "-");
-      return `<li><strong>Rodada ${card.dataset.round}:</strong> ${escapeHtml(names[0])} ${scores[0]} × ${scores[1]} ${escapeHtml(names[1])} — ${escapeHtml(status)}</li>`;
+      const observation = card.querySelector("[data-match-observation]")?.textContent || "";
+      return `<li><strong>Rodada ${card.dataset.round}:</strong> ${escapeHtml(names[0])} ${scores[0]} × ${scores[1]} ${escapeHtml(names[1])} — ${escapeHtml(status)}${observation ? `<br><small>${escapeHtml(observation)}</small>` : ""}</li>`;
     }).join("");
     const multipleChoice = selectedCard && dirtyCards.length > 1;
     modal.innerHTML = `<div class="admin-modal admin-save-modal ${multipleChoice ? "has-multiple-actions" : ""}" role="dialog" aria-modal="true"><i class="bi bi-check2-square"></i><h2>Confira as alterações</h2><ul>${list}</ul><div class="admin-modal-actions"><button class="btn btn-admin-secondary" data-scope="cancel">Cancelar</button>${multipleChoice ? '<button class="btn btn-admin-secondary" data-scope="one">Salvar esta</button>' : ""}<button class="btn" data-scope="all">${multipleChoice ? "Salvar tudo" : "Confirmar"}</button></div></div>`;

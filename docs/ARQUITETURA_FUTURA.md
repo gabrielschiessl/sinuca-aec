@@ -138,6 +138,48 @@ Após uma alteração confirmada, o sistema deve atualizar:
 - Os pesos e critérios exatos de pontuação serão definidos antes da
   implementação.
 
+## Migração futura da API e do banco de dados
+
+Esta etapa ficará deliberadamente para depois que a proposta funcional e visual
+do aplicativo estiver consolidada e pronta para apresentação. O objetivo é
+evitar reconstruir a API e o banco enquanto regras, telas e fluxos ainda estão
+mudando.
+
+**Frase para retomar esta etapa:** `migração para MySQL`.
+
+Quando essa expressão for mencionada, retomar este planejamento:
+
+1. Confirmar o plano e os recursos disponíveis na hospedagem HostGator.
+2. Preferir inicialmente uma API em PHP com MySQL no mesmo servidor, caso seja
+   uma hospedagem compartilhada tradicional. Avaliar Node.js somente se o plano
+   oferecer suporte adequado.
+3. Modelar as tabelas de temporadas, jogadores, participantes, partidas,
+   administradores, sessões e auditoria.
+4. Criar índices compostos para as consultas principais, especialmente por
+   temporada, divisão, rodada e número do participante.
+5. Preservar os contratos públicos da API sempre que possível para que o
+   frontend atual não precise ser reconstruído.
+6. Manter produção e QAS com bancos, credenciais e configurações separados.
+7. Preparar scripts de criação, migração, validação e reversão antes de alterar
+   a produção.
+8. Migrar primeiro uma cópia dos dados para QAS, comparar temporadas,
+   classificações, resultados e ranking e somente depois migrar a produção.
+9. Manter backup integral das planilhas e do banco antes de cada migração.
+10. Armazenar credenciais somente em variáveis de ambiente ou arquivos locais
+    ignorados pelo Git, acompanhados por um `.env.example` sem segredos.
+
+A execução poderá ser conduzida diretamente da máquina de desenvolvimento se o
+MySQL remoto estiver habilitado e restrito ao IP autorizado. Caso o plano não
+permita esse acesso, gerar um arquivo SQL revisado para importação pelo cPanel ou
+phpMyAdmin.
+
+A nova API deverá conservar os recursos já consolidados: temporadas atuais e
+históricas, divisões opcionais conforme a temporada, importação por planilha,
+rascunhos, publicação, arquivamento, administração de partidas, autenticação
+Google, ranking e consultas públicas. A autenticação, as sessões, o CORS, as
+transações, a auditoria, os backups e a proteção contra injeção SQL deverão fazer
+parte da migração, e não ser adicionados posteriormente.
+
 ### Modelo para importação por planilha
 
 - Para temporadas históricas, a planilha será a entrada obrigatória. Após a

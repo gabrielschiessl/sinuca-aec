@@ -78,15 +78,16 @@ function salvarPartidaAdmin(dados) {
   const rodada = Number(dados.rodada);
   const numero1 = Number(dados.numero1);
   const numero2 = Number(dados.numero2);
-  const validado = validarEstadoPartida(
-    dados.status,
-    dados.placar1,
-    dados.placar2,
-  );
-
   if (!['A', 'B'].includes(divisao) || !rodada || !numero1 || !numero2) {
     throw new Error("Partida inválida ou incompleta.");
   }
+  const validado = prepararEstadoPartidaAdmin(
+    dados,
+    temporada,
+    divisao,
+    numero1,
+    numero2,
+  );
 
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -120,6 +121,9 @@ function salvarPartidaAdmin(dados) {
       .getRange(linhaPlanilha, coluna("placar2") + 1)
       .setValue(validado.placar2);
     aba
+      .getRange(linhaPlanilha, coluna("observacao") + 1)
+      .setValue(validado.observacao);
+    aba
       .getRange(linhaPlanilha, coluna("atualizado_em") + 1)
       .setValue(new Date());
 
@@ -128,6 +132,7 @@ function salvarPartidaAdmin(dados) {
       status: validado.status,
       placar1: validado.placar1,
       placar2: validado.placar2,
+      observacao: validado.observacao,
     };
   } finally {
     lock.releaseLock();
@@ -143,7 +148,16 @@ function salvarPartidasAdmin(dados) {
     if (!["A", "B"].includes(divisao) || !Number(partida.rodada) || !Number(partida.numero1) || !Number(partida.numero2)) {
       throw new Error("Uma das partidas está inválida ou incompleta.");
     }
-    validarEstadoPartida(partida.status, partida.placar1, partida.placar2);
+    const numeroPerdedorWo = Number(partida.wo_perdedor) || null;
+    if (
+      numeroPerdedorWo !== null &&
+      ![Number(partida.numero1), Number(partida.numero2)].includes(numeroPerdedorWo)
+    ) {
+      throw new Error("O jogador indicado para o W.O. não pertence à partida.");
+    }
+    if (numeroPerdedorWo === null) {
+      validarEstadoPartida(partida.status, partida.placar1, partida.placar2);
+    }
   });
 
   const resultados = partidas.map((partida) => ({
@@ -202,6 +216,35 @@ function validarEstadoPartida(statusInformado, placar1Informado, placar2Informad
   }
 
   return { status, placar1, placar2 };
+}
+
+function prepararEstadoPartidaAdmin(dados, temporada, divisao, numero1, numero2) {
+  const numeroPerdedorWo = Number(dados.wo_perdedor) || null;
+  if (numeroPerdedorWo !== null) {
+    if (![numero1, numero2].includes(numeroPerdedorWo)) {
+      throw new Error("O jogador indicado para o W.O. não pertence à partida.");
+    }
+    const participante = getParticipante(
+      temporada,
+      divisao,
+      numeroPerdedorWo,
+    );
+    const jogador = participante && getJogador(participante.jogador_id);
+    if (!jogador) throw new Error("Não foi possível identificar o jogador que perdeu por W.O.");
+    return {
+      status: "E",
+      placar1: numeroPerdedorWo === numero1 ? 0 : 2,
+      placar2: numeroPerdedorWo === numero2 ? 0 : 2,
+      observacao: `W.O.: ${jogador.exibicao || jogador.nome}`,
+    };
+  }
+
+  const estado = validarEstadoPartida(dados.status, dados.placar1, dados.placar2);
+  const observacao = String(dados.observacao || "").trim();
+  if (observacao.length > 300) {
+    throw new Error("A observação da partida deve possuir no máximo 300 caracteres.");
+  }
+  return { ...estado, observacao };
 }
 
 /************************************************
