@@ -149,13 +149,14 @@ function salvarPartidasAdmin(dados) {
       throw new Error("Uma das partidas está inválida ou incompleta.");
     }
     const numeroPerdedorWo = Number(partida.wo_perdedor) || null;
+    const woAmbos = partida.wo_ambos === true || String(partida.wo_ambos).toLowerCase() === "true";
     if (
       numeroPerdedorWo !== null &&
       ![Number(partida.numero1), Number(partida.numero2)].includes(numeroPerdedorWo)
     ) {
       throw new Error("O jogador indicado para o W.O. não pertence à partida.");
     }
-    if (numeroPerdedorWo === null) {
+    if (numeroPerdedorWo === null && !woAmbos) {
       validarEstadoPartida(partida.status, partida.placar1, partida.placar2);
     }
   });
@@ -219,6 +220,16 @@ function validarEstadoPartida(statusInformado, placar1Informado, placar2Informad
 }
 
 function prepararEstadoPartidaAdmin(dados, temporada, divisao, numero1, numero2) {
+  const woAmbos = dados.wo_ambos === true || String(dados.wo_ambos).toLowerCase() === "true";
+  if (woAmbos) {
+    return {
+      status: "E",
+      placar1: 0,
+      placar2: 0,
+      observacao: "W.O.: ambos abandonaram a competição",
+    };
+  }
+
   const numeroPerdedorWo = Number(dados.wo_perdedor) || null;
   if (numeroPerdedorWo !== null) {
     if (![numero1, numero2].includes(numeroPerdedorWo)) {

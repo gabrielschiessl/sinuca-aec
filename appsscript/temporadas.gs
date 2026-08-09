@@ -141,7 +141,8 @@ function salvarTemporadaLegada(dados) {
     adicionarObjetosAba(
       abaParticipantes,
       ["A", "B"].flatMap((divisao) => participantes[divisao].map((item, indiceParticipante) => ({
-        temporada, versao, divisao, numero: indiceParticipante + 1, jogador_id: item.jogador_id,
+        temporada, versao, divisao, numero: indiceParticipante + 1,
+        jogador_id: item.jogador_id, desempate: item.desempate || "",
       }))),
     );
     adicionarObjetosAba(
@@ -152,7 +153,7 @@ function salvarTemporadaLegada(dados) {
           numero1: partida.numero1, numero2: partida.numero2,
           data: partida.data, hora: partida.hora, status: partida.status,
           placar1: partida.placar1, placar2: partida.placar2,
-          observacao: "", atualizado_em: agora, folga: rodada.folga || "",
+          observacao: partida.observacao || "", atualizado_em: agora, folga: rodada.folga || "",
         })),
       )),
     );
@@ -177,7 +178,13 @@ function normalizarRascunhoTemporadaLegada(dados) {
         if (!placaresPermitidos.has(placar1) || !placaresPermitidos.has(placar2)) {
           throw new Error("Uma partida histórica possui um placar inválido.");
         }
-        return { ...partida, status: "E", placar1, placar2 };
+        return {
+          ...partida,
+          status: "E",
+          placar1,
+          placar2,
+          observacao: String(informada.observacao || "").trim(),
+        };
       }),
     }));
     return resultado;
@@ -186,23 +193,7 @@ function normalizarRascunhoTemporadaLegada(dados) {
 }
 
 function validarConteudoTemporadaLegada(dados) {
-  const participantes = validarParticipantesTemporadaLegada(dados.participantes);
-  const rodadasValidadas = validarRodadasTemporadaLegada(dados.rodadas, participantes);
-  const rodadas = ["A", "B"].reduce((resultado, divisao) => {
-    resultado[divisao] = rodadasValidadas[divisao].map((rodada, indiceRodada) => ({
-      ...rodada,
-      partidas: rodada.partidas.map((partida, indicePartida) => {
-        const informada = dados.rodadas[divisao][indiceRodada].partidas[indicePartida] || {};
-        const estado = validarEstadoPartida(
-          "E",
-          informada.placar1,
-          informada.placar2,
-        );
-        return { ...partida, ...estado };
-      }),
-    }));
-    return resultado;
-  }, {});
+  const { participantes, rodadas } = normalizarRascunhoTemporadaLegada(dados);
   validarAgendaPublicacaoTemporada(rodadas);
   return { participantes, rodadas };
 }
@@ -240,6 +231,7 @@ function publicarTemporadaLegada(temporadaInformada) {
             divisao,
             numero: indice + 1,
             jogador_id: item.jogador_id,
+            desempate: item.desempate || "",
           })),
         ),
       );
@@ -258,7 +250,7 @@ function publicarTemporadaLegada(temporadaInformada) {
               status: partida.status,
               placar1: partida.placar1,
               placar2: partida.placar2,
-              observacao: "",
+              observacao: partida.observacao || "",
               atualizado_em: agora,
             })),
           ),
@@ -771,7 +763,12 @@ function garantirEstruturaTemporadas() {
   obterOuCriarAba(
     planilha,
     SHEETS.temporadasParticipantes,
-    ["temporada", "versao", "divisao", "numero", "jogador_id"],
+    ["temporada", "versao", "divisao", "numero", "jogador_id", "desempate"],
+  );
+  obterOuCriarAba(
+    planilha,
+    SHEETS.participantes,
+    ["temporada", "divisao", "numero", "jogador_id", "desempate"],
   );
   obterOuCriarAba(
     planilha,
@@ -883,7 +880,17 @@ function normalizarParticipanteTemporada(item) {
     divisao: String(item.divisao).trim().toUpperCase(),
     numero: Number(item.numero),
     jogador_id: Number(item.jogador_id),
+    desempate: normalizarPrioridadeDesempate(item.desempate),
   };
+}
+
+function normalizarPrioridadeDesempate(valor) {
+  if (valor === "" || valor === null || valor === undefined) return null;
+  const prioridade = Number(valor);
+  if (!Number.isInteger(prioridade) || prioridade < 1) {
+    throw new Error("A prioridade de desempate deve ser um número inteiro a partir de 1.");
+  }
+  return prioridade;
 }
 
 function validarParticipantesTemporada(valor) {
@@ -893,7 +900,10 @@ function validarParticipantesTemporada(valor) {
 
   ["A", "B"].forEach((divisao) => {
     const lista = Array.isArray(participantes[divisao]) ? participantes[divisao] : [];
-    resultado[divisao] = lista.map((item) => ({ jogador_id: Number(item.jogador_id) }));
+    resultado[divisao] = lista.map((item) => ({
+      jogador_id: Number(item.jogador_id),
+      desempate: normalizarPrioridadeDesempate(item.desempate),
+    }));
     if (resultado[divisao].some((item) => !jogadoresExistentes.has(item.jogador_id))) {
       throw new Error(`A Série ${divisao} possui um jogador inválido.`);
     }
@@ -919,7 +929,10 @@ function validarParticipantesTemporadaLegada(valor) {
 
   ["A", "B"].forEach((divisao) => {
     const lista = Array.isArray(participantes[divisao]) ? participantes[divisao] : [];
-    resultado[divisao] = lista.map((item) => ({ jogador_id: Number(item.jogador_id) }));
+    resultado[divisao] = lista.map((item) => ({
+      jogador_id: Number(item.jogador_id),
+      desempate: normalizarPrioridadeDesempate(item.desempate),
+    }));
     if (resultado[divisao].some((item) => !jogadoresExistentes.has(item.jogador_id))) {
       throw new Error(`A Série ${divisao} possui um jogador inválido.`);
     }
@@ -1213,6 +1226,7 @@ function normalizarRodadaTemporada(item) {
     status: item.status || "A",
     placar1: item.placar1 === "" ? "-" : item.placar1,
     placar2: item.placar2 === "" ? "-" : item.placar2,
+    observacao: String(item.observacao || "").trim(),
     folga: Number(item.folga) || null,
   };
 }
@@ -1256,6 +1270,7 @@ function agruparChaveamentoTemporada(partidas) {
           status: partida.status,
           placar1: partida.placar1,
           placar2: partida.placar2,
+          observacao: partida.observacao,
         });
       });
     resultado[divisao] = Object.values(mapa).sort((a, b) => a.rodada - b.rodada);

@@ -26,37 +26,41 @@ export function matchCard(partida) {
 
     <div class="match-body">
 
-        <div class="player-name">
+        <div class="match-competitor">
+
+          <div class="player-name">
 
             ${partida.jogador1.exibicao}
 
+          </div>
+
+          ${scoreBox({
+            value: partida.placar1,
+            editable: partida.edicao.pode_editar,
+            player: "1",
+          })}
+
         </div>
 
-        <div class="score-inputs">
+        <span class="score-x">
 
-    ${scoreBox({
-      value: partida.placar1,
-      editable: partida.edicao.pode_editar,
-      player: "1",
-    })}
+          X
 
-    <span class="score-x">
+        </span>
 
-        X
+        <div class="match-competitor">
 
-    </span>
-
-    ${scoreBox({
-      value: partida.placar2,
-      editable: partida.edicao.pode_editar,
-      player: "2",
-    })}
-
-</div>
-
-        <div class="player-name">
+          <div class="player-name">
 
             ${partida.jogador2.exibicao}
+
+          </div>
+
+          ${scoreBox({
+            value: partida.placar2,
+            editable: partida.edicao.pode_editar,
+            player: "2",
+          })}
 
         </div>
 

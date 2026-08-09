@@ -550,7 +550,18 @@ async function readLegacySeasonSpreadsheet(file, players) {
     const player = resolveImportedPlayer(row, players, index + 2);
     if (usedPlayers.has(Number(player.id))) throw new Error(`O jogador ${player.exibicao} aparece mais de uma vez em Participantes.`);
     usedPlayers.add(Number(player.id));
-    participantes[division].push({ divisao: division, numero: number, jogador_id: Number(player.id) });
+    const tiebreak = row.desempate === "" || row.desempate === undefined
+      ? null
+      : Number(row.desempate);
+    if (tiebreak !== null && (!Number.isInteger(tiebreak) || tiebreak < 1)) {
+      throw new Error(`Participantes, linha ${index + 2}: desempate deve ser um inteiro a partir de 1.`);
+    }
+    participantes[division].push({
+      divisao: division,
+      numero: number,
+      jogador_id: Number(player.id),
+      desempate: tiebreak,
+    });
   });
   ["A", "B"].forEach((division) => {
     participantes[division].sort((a, b) => a.numero - b.numero);
@@ -594,6 +605,7 @@ async function readLegacySeasonSpreadsheet(file, players) {
       status: "E",
       placar1,
       placar2,
+      observacao: String(row.observacao || "").trim(),
     });
   });
 
@@ -751,13 +763,15 @@ function renderSeasonEditor() {
   const players = seasonDraft.jogadores || [];
   const options = (selected) => players.map((player) => `<option value="${player.id}" data-player-search="${escapeHtml([player.nome, player.exibicao, player.apelido].filter(Boolean).join(" "))}" ${Number(selected) === Number(player.id) ? "selected" : ""}>${escapeHtml(player.exibicao)}${player.ativo ? "" : " (inativo)"}</option>`).join("");
   const rows = (division) => seasonDraft.participantes[division].map((participant, index) => `
-    <div class="admin-season-participant" data-season-participant data-division="${division}">
+    <div class="admin-season-participant ${seasonDraft.modo === "LEGADA" ? "has-tiebreak" : ""}" data-season-participant data-division="${division}">
       <span>${index + 1}</span><select class="admin-select" ${adminEditMode ? "" : "disabled"}>${options(participant.jogador_id)}</select>
+      ${seasonDraft.modo === "LEGADA" ? `<label class="admin-season-tiebreak" title="Prioridade interna aplicada somente em empates"><span>Desempate</span><input class="admin-input" type="number" min="1" step="1" inputmode="numeric" value="${participant.desempate || ""}" data-season-tiebreak ${adminEditMode ? "" : "disabled"}></label>` : ""}
       ${division === "B" ? '<button class="btn btn-admin-secondary" type="button" data-remove-season-player aria-label="Remover participante"><i class="bi bi-trash"></i></button>' : ""}
     </div>`).join("");
   editor.hidden = false;
   editor.innerHTML = `
     <div class="admin-season-editor-heading"><div><strong>Temporada ${seasonDraft.temporada}</strong><span>${seasonDraft.modo === "LEGADA" ? seasonDraft.persistida ? "Rascunho histórico salvo" : "Cadastro de temporada passada" : seasonDraft.persistida ? "Preparação salva" : "Novo rascunho não salvo"}</span></div>${seasonDraft.persistida ? `<div class="admin-season-editor-controls"><button class="btn" type="button" data-activate-season>${seasonDraft.modo === "LEGADA" ? "Publicar" : "Ativar temporada"}</button><button class="btn btn-admin-danger" type="button" data-delete-season>Excluir temporada</button></div>` : ""}</div>
+    ${seasonDraft.modo === "LEGADA" ? '<p class="admin-season-tiebreak-note"><strong>Desempate interno:</strong> use 1, 2, 3… somente para definir a ordem manual entre jogadores com os mesmos números de vitórias e partidas ganhas. Essa prioridade não aparece no site público.</p>' : ""}
     <div class="admin-season-divisions">
       <section><h3>Série A <small>${seasonDraft.participantes.A.length} participantes</small></h3><div data-season-list="A">${rows("A")}</div></section>
       <section><h3>Série B <small>${seasonDraft.participantes.B.length} participantes${seasonDraft.modo === "LEGADA" ? " (opcional)" : ""}</small></h3><div data-season-list="B">${rows("B")}</div><button class="btn btn-admin-secondary admin-season-add" type="button" data-add-season-player ${adminEditMode ? "" : "disabled"}><i class="bi bi-person-plus"></i> Adicionar participante</button></section>
@@ -765,6 +779,7 @@ function renderSeasonEditor() {
     ${renderSeasonSchedulePreview()}
     <div class="admin-season-actions"><button class="btn btn-admin-secondary" type="button" data-cancel-season>Cancelar alterações</button><button class="btn" type="button" data-save-season ${adminEditMode ? "" : "disabled"}>${seasonDraft.modo === "LEGADA" ? "Salvar rascunho" : "Salvar temporada"}</button></div>`;
   editor.querySelectorAll("[data-season-participant] select").forEach((select) => select.addEventListener("change", syncSeasonDraftFromEditor));
+  editor.querySelectorAll("[data-season-tiebreak]").forEach((input) => input.addEventListener("change", syncSeasonDraftFromEditor));
   editor.querySelectorAll("[data-season-participant] select").forEach(enhanceSearchablePlayerSelect);
   editor.querySelectorAll("[data-remove-season-player]").forEach((button) => button.addEventListener("click", removeSeasonPlayer));
   editor.querySelector("[data-add-season-player]")?.addEventListener("click", addSeasonPlayer);
@@ -792,8 +807,15 @@ function renderSeasonEditor() {
 function syncSeasonDraftFromEditor() {
   const editor = getPage()?.querySelector("[data-season-editor]");
   ["A", "B"].forEach((division) => {
-    seasonDraft.participantes[division] = [...editor.querySelectorAll(`[data-season-participant][data-division="${division}"] select`)]
-      .map((select, index) => ({ divisao: division, numero: index + 1, jogador_id: Number(select.value) }));
+    seasonDraft.participantes[division] = [...editor.querySelectorAll(`[data-season-participant][data-division="${division}"]`)]
+      .map((row, index) => ({
+        divisao: division,
+        numero: index + 1,
+        jogador_id: Number(row.querySelector("select").value),
+        desempate: row.querySelector("[data-season-tiebreak]")?.value
+          ? Number(row.querySelector("[data-season-tiebreak]").value)
+          : null,
+      }));
   });
   editor.classList.toggle("is-dirty", isSeasonDirty());
 }
@@ -838,9 +860,10 @@ function renderSeasonRoundSchedule(division, round, playerName) {
 
 function renderHistoricalMatchResult(division, roundIndex, matchIndex, match) {
   if (seasonDraft.modo !== "LEGADA") return "";
-  const option = (value, selected) => `<option value="${value}" ${String(selected) === String(value) ? "selected" : ""}>${value}</option>`;
+  const option = (value, selected, label = value) => `<option value="${value}" ${String(selected) === String(value) ? "selected" : ""}>${label}</option>`;
   const attributes = `data-division="${division}" data-round-index="${roundIndex}" data-match-index="${matchIndex}" ${adminEditMode ? "" : "disabled"}`;
-  return `<label><span>Placar</span><div class="admin-season-history-score"><select class="admin-select" data-season-schedule-field="placar1" ${attributes}>${["-",0,1,2].map((value) => option(value, match.placar1 ?? "-")).join("")}</select><b>×</b><select class="admin-select" data-season-schedule-field="placar2" ${attributes}>${["-",0,1,2].map((value) => option(value, match.placar2 ?? "-")).join("")}</select></div></label><label><span>Status</span><span class="admin-season-history-status"><i class="bi bi-check-circle"></i> Encerrada</span></label>`;
+  const scoreOptions = (selected) => ["-", 0, 1, 2].map((value) => option(value, selected)).join("") + option("WO", selected, "W.O.") + option("WO2", selected, "W.O. 2");
+  return `<label><span>Placar</span><div class="admin-season-history-score"><select class="admin-select" data-season-schedule-field="placar1" ${attributes}>${scoreOptions(match.placar1 ?? "-")}</select><b>×</b><select class="admin-select" data-season-schedule-field="placar2" ${attributes}>${scoreOptions(match.placar2 ?? "-")}</select></div></label><label><span>Status</span><span class="admin-season-history-status"><i class="bi bi-check-circle"></i> Encerrada</span></label><small class="admin-season-history-observation" data-season-history-observation ${match.observacao ? "" : "hidden"}>${escapeHtml(match.observacao || "")}</small>`;
 }
 
 function getCommonSeasonRoundValue(round, field) {
@@ -930,7 +953,32 @@ function updateSeasonScheduleField(event) {
     ?.partidas[Number(input.dataset.matchIndex)];
   if (!match) return;
   const field = input.dataset.seasonScheduleField;
-  match[field] = input.value;
+  const matchElement = input.closest(".admin-season-match-preview");
+  if (["placar1", "placar2"].includes(field) && ["WO", "WO2"].includes(input.value)) {
+    const loserIsFirst = field === "placar1";
+    if (input.value === "WO2") {
+      match.placar1 = "0";
+      match.placar2 = "0";
+      match.observacao = "W.O.: ambos abandonaram a competição";
+    } else {
+      match.placar1 = loserIsFirst ? "0" : "2";
+      match.placar2 = loserIsFirst ? "2" : "0";
+      match.observacao = `W.O.: ${getSeasonPlayerName(input.dataset.division, loserIsFirst ? match.numero1 : match.numero2)}`;
+    }
+    const scoreInputs = matchElement?.querySelectorAll('.admin-season-history-score select') || [];
+    if (scoreInputs[0]) scoreInputs[0].value = match.placar1;
+    if (scoreInputs[1]) scoreInputs[1].value = match.placar2;
+  } else {
+    match[field] = input.value;
+    if (["placar1", "placar2"].includes(field) && /^W\.O\.:/i.test(match.observacao || "")) {
+      match.observacao = "";
+    }
+  }
+  const observation = matchElement?.querySelector("[data-season-history-observation]");
+  if (observation) {
+    observation.textContent = match.observacao || "";
+    observation.hidden = !match.observacao;
+  }
   if (field === "status" && input.value === "A") {
     match.placar1 = "-";
     match.placar2 = "-";
@@ -1157,7 +1205,10 @@ function isSeasonDirty() {
   if (!savedSeasonDraft) return true;
   const comparable = (draft) => ({
     participantes: ["A", "B"].map((division) =>
-      draft.participantes[division].map((item) => Number(item.jogador_id)),
+      draft.participantes[division].map((item) => [
+        Number(item.jogador_id),
+        Number(item.desempate) || null,
+      ]),
     ),
     rodadas: ["A", "B"].map((division) =>
       (draft.rodadas?.[division] || []).map((round) =>
@@ -1171,6 +1222,7 @@ function isSeasonDirty() {
             match.status || "A",
             String(match.placar1 ?? "-"),
             String(match.placar2 ?? "-"),
+            match.observacao || "",
           ]),
         ],
       ),
@@ -1255,31 +1307,6 @@ async function saveSeasonChanges() {
   }
 }
 
-function findInvalidHistoricalResult() {
-  const schedules = getEffectiveSeasonSchedules();
-  for (const division of ["A", "B"]) {
-    for (const round of schedules[division]) {
-      for (let index = 0; index < round.partidas.length; index += 1) {
-        const match = round.partidas[index];
-        const score1 = Number(match.placar1);
-        const score2 = Number(match.placar2);
-        const validScores = [score1, score2].every(
-          (score) => Number.isInteger(score) && score >= 0 && score <= 2,
-        );
-        if (
-          match.status !== "E" ||
-          !validScores ||
-          [score1, score2].filter((score) => score === 2).length !== 1 ||
-          score1 === score2
-        ) {
-          return { division, round: round.rodada, match: index + 1 };
-        }
-      }
-    }
-  }
-  return null;
-}
-
 async function deleteSeasonDraft() {
   const confirmed = await confirmAdminChange("Excluir temporada?", `Todos os dados preparados para ${seasonDraft.temporada} serão apagados. Esta ação não pode ser desfeita.`);
   if (!confirmed) return;
@@ -1304,17 +1331,6 @@ async function activateSeasonDraft() {
     return;
   }
   const legacy = seasonDraft.modo === "LEGADA";
-  if (legacy) {
-    const invalidResult = findInvalidHistoricalResult();
-    if (invalidResult) {
-      showAdminModal(
-        "Resultado histórico incompleto",
-        `Confira a Série ${invalidResult.division}, rodada ${invalidResult.round}, partida ${invalidResult.match}. Uma partida encerrada deve ter exatamente um vencedor com 2 pontos.`,
-        "error",
-      );
-      return;
-    }
-  }
   const confirmed = await confirmAdminChange(
     legacy ? "Publicar temporada passada?" : "Ativar nova temporada?",
     legacy
@@ -1847,7 +1863,7 @@ function applyAdminMatchFilters() {
 
 function renderAdminMatch(partida) {
   const observation = partida.observacao?.texto || "";
-  return `<article class="admin-match" data-admin-match data-round="${partida.rodada}" data-player1="${partida.jogador1.numero}" data-player2="${partida.jogador2.numero}" data-original-status="${partida.status.codigo}" data-original-score1="${partida.placar1}" data-original-score2="${partida.placar2}" data-original-observation="${escapeHtml(observation)}" data-wo-loser="">
+  return `<article class="admin-match" data-admin-match data-round="${partida.rodada}" data-player1="${partida.jogador1.numero}" data-player2="${partida.jogador2.numero}" data-original-status="${partida.status.codigo}" data-original-score1="${partida.placar1}" data-original-score2="${partida.placar2}" data-original-observation="${escapeHtml(observation)}" data-wo-loser="" data-wo-both="">
     <div class="admin-match-players"><strong>${escapeHtml(partida.jogador1.exibicao)}</strong><span>×</span><strong>${escapeHtml(partida.jogador2.exibicao)}</strong></div>
     <div class="admin-match-controls"><select class="admin-select" data-match-status ${adminEditMode ? "" : "disabled"}>${statusOption("A", "Agendada", partida.status.codigo)}${statusOption("V", "Ao vivo", partida.status.codigo)}${statusOption("E", "Encerrada", partida.status.codigo)}</select><div class="admin-score-pair">${scoreSelect(partida.placar1)}<span>×</span>${scoreSelect(partida.placar2)}</div><button class="btn btn-admin-save" type="button" data-save-match ${adminEditMode ? "" : "disabled"}>Salvar</button></div>
     <small class="admin-match-observation" data-match-observation ${observation ? "" : "hidden"}>${escapeHtml(observation)}</small>
@@ -1860,7 +1876,7 @@ function statusOption(value, label, selected) {
 
 function scoreSelect(value) {
   const normalized = value === "-" ? "" : String(value);
-  return `<select class="admin-select admin-score" data-match-score ${adminEditMode ? "" : "disabled"}><option value="" ${normalized === "" ? "selected" : ""}>-</option>${[0, 1, 2].map((score) => `<option value="${score}" ${normalized === String(score) ? "selected" : ""}>${score}</option>`).join("")}<option value="WO">W.O.</option></select>`;
+  return `<select class="admin-select admin-score" data-match-score ${adminEditMode ? "" : "disabled"}><option value="" ${normalized === "" ? "selected" : ""}>-</option>${[0, 1, 2].map((score) => `<option value="${score}" ${normalized === String(score) ? "selected" : ""}>${score}</option>`).join("")}<option value="WO">W.O.</option><option value="WO2">W.O. 2</option></select>`;
 }
 
 function setAdminMatchObservation(card, value) {
@@ -1887,6 +1903,7 @@ function bindAdminMatchEvents(divisao) {
         if (!confirmed) { status.value = previous; return; }
         scores.forEach((score) => { score.value = ""; score.disabled = false; });
         card.dataset.woLoser = "";
+        card.dataset.woBoth = "";
         if (/^W\.O\.:/i.test(card.querySelector("[data-match-observation]")?.textContent || "")) {
           setAdminMatchObservation(card, "");
         }
@@ -1907,19 +1924,31 @@ function bindAdminMatchEvents(divisao) {
       updateCardDirtyState(card);
     });
     scores.forEach((score, scoreIndex) => score.addEventListener("change", () => {
+      if (score.value === "WO2") {
+        scores.forEach((item) => { item.value = "0"; });
+        card.dataset.woLoser = "";
+        card.dataset.woBoth = "true";
+        setAdminMatchObservation(card, "W.O.: ambos abandonaram a competição");
+        status.value = "E";
+        status.dataset.previousStatus = "E";
+        updateCardDirtyState(card);
+        return;
+      }
       if (score.value === "WO") {
         const loserName = card.querySelectorAll(".admin-match-players strong")[scoreIndex]?.textContent.trim() || "Jogador";
         scores[scoreIndex].value = "0";
         scores[scoreIndex === 0 ? 1 : 0].value = "2";
         card.dataset.woLoser = scoreIndex === 0 ? card.dataset.player1 : card.dataset.player2;
+        card.dataset.woBoth = "";
         setAdminMatchObservation(card, `W.O.: ${loserName}`);
         status.value = "E";
         status.dataset.previousStatus = "E";
         updateCardDirtyState(card);
         return;
       }
-      if (card.dataset.woLoser || /^W\.O\.:/i.test(card.querySelector("[data-match-observation]")?.textContent || "")) {
+      if (card.dataset.woLoser || card.dataset.woBoth || /^W\.O\.:/i.test(card.querySelector("[data-match-observation]")?.textContent || "")) {
         card.dataset.woLoser = "";
+        card.dataset.woBoth = "";
         setAdminMatchObservation(card, "");
       }
       if (scores.some((item) => item.value === "2")) {
@@ -1951,6 +1980,19 @@ function updateCardDirtyState(card) {
 function getCardChange(card, divisao) {
   const status = card.querySelector("[data-match-status]").value;
   const scores = [...card.querySelectorAll("[data-match-score]")].map((item) => item.value);
+  if (card.dataset.woBoth) {
+    return {
+      divisao,
+      rodada: card.dataset.round,
+      numero1: card.dataset.player1,
+      numero2: card.dataset.player2,
+      status: "E",
+      placar1: 0,
+      placar2: 0,
+      observacao: "W.O.: ambos abandonaram a competição",
+      wo_ambos: true,
+    };
+  }
   const validation = validateMatchState(status, scores[0], scores[1]);
   if (validation.error) return { error: validation.error };
   return { divisao, rodada: card.dataset.round, numero1: card.dataset.player1, numero2: card.dataset.player2, observacao: card.querySelector("[data-match-observation]")?.textContent || "", ...(card.dataset.woLoser ? { wo_perdedor: card.dataset.woLoser } : {}), ...validation };
@@ -1990,6 +2032,7 @@ async function saveCards(cards, divisao) {
       card.dataset.originalScore2 = String(result.placar2);
       card.dataset.originalObservation = result.observacao || "";
       card.dataset.woLoser = "";
+      card.dataset.woBoth = "";
       setAdminMatchObservation(card, result.observacao || "");
       card.classList.remove("is-dirty", "has-error");
       scores.forEach((score) => { score.disabled = !adminEditMode; });

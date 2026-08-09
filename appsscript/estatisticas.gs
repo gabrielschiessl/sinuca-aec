@@ -75,6 +75,8 @@ function calcularEstatisticasSerie({
 
   const jogadoresPorId = {};
   const estatisticasPorNumero = {};
+  const confrontosDiretos = {};
+  const prioridadesDesempate = {};
 
   jogadores.forEach((jogador) => {
     jogadoresPorId[Number(jogador.id)] = jogador;
@@ -83,6 +85,11 @@ function calcularEstatisticasSerie({
   participantesDaSerie.forEach((participante) => {
     const numero = Number(participante.numero);
     const jogador = jogadoresPorId[Number(participante.jogador_id)];
+    const prioridade = Number(participante.desempate);
+
+    if (Number.isInteger(prioridade) && prioridade > 0) {
+      prioridadesDesempate[numero] = prioridade;
+    }
 
     if (!jogador) {
       return;
@@ -119,6 +126,15 @@ function calcularEstatisticasSerie({
     if (placar1 === 2) jogador1.vitorias += 1;
     if (placar2 === 2) jogador2.vitorias += 1;
 
+    const chaveConfronto = [jogador1.numero, jogador2.numero]
+      .sort((a, b) => a - b)
+      .join("-");
+    if ([placar1, placar2].filter((placar) => placar === 2).length === 1) {
+      confrontosDiretos[chaveConfronto] = placar1 === 2
+        ? jogador1.numero
+        : jogador2.numero;
+    }
+
     jogador1.resultados.push(
       montarResultado(partida, placar1, placar2, jogador2),
     );
@@ -137,14 +153,44 @@ function calcularEstatisticasSerie({
       resultados: jogador.resultados.sort((a, b) => a.rodada - b.rodada),
     }),
   );
-  const classificacao = jogadoresOrdenados
+  const classificacaoPreliminar = jogadoresOrdenados
     .map((jogador) => ({ ...jogador }))
     .sort(
       (a, b) =>
         b.vitorias - a.vitorias ||
         b.partidas_vencidas - a.partidas_vencidas ||
         a.numero - b.numero,
-    )
+    );
+  const classificacaoOrdenada = [];
+  for (let indice = 0; indice < classificacaoPreliminar.length;) {
+    const referencia = classificacaoPreliminar[indice];
+    const empatados = classificacaoPreliminar.filter(
+      (jogador) =>
+        jogador.vitorias === referencia.vitorias &&
+        jogador.partidas_vencidas === referencia.partidas_vencidas,
+    );
+    empatados.sort((a, b) => {
+      const prioridadeA = prioridadesDesempate[a.numero] || Number.POSITIVE_INFINITY;
+      const prioridadeB = prioridadesDesempate[b.numero] || Number.POSITIVE_INFINITY;
+      return prioridadeA - prioridadeB || a.numero - b.numero;
+    });
+    const prioridadesIguais = empatados.length === 2 &&
+      (prioridadesDesempate[empatados[0].numero] || null) ===
+        (prioridadesDesempate[empatados[1].numero] || null);
+    if (prioridadesIguais) {
+      const chaveConfronto = empatados
+        .map((jogador) => jogador.numero)
+        .sort((a, b) => a - b)
+        .join("-");
+      const vencedor = confrontosDiretos[chaveConfronto];
+      empatados.sort((a, b) =>
+        vencedor === a.numero ? -1 : vencedor === b.numero ? 1 : a.numero - b.numero,
+      );
+    }
+    classificacaoOrdenada.push(...empatados);
+    indice += empatados.length;
+  }
+  const classificacao = classificacaoOrdenada
     .map((jogador, indice, lista) => ({
       ...jogador,
       posicao: indice + 1,
