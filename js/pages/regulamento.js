@@ -34,19 +34,19 @@ export function renderRegulamento() {
         <div class="balls-panel">
           <h1>Bolas e pontuação</h1>
           <div class="balls-grid">
-            ${renderBola("branca.png", "Tacadeira", "Bola branca")}
-            ${renderBola("vermelha.png", "1 ponto", "Bola vermelha")}
-            ${renderBola("amarela.png", "2 pontos", "Bola amarela")}
-            ${renderBola("verde.png", "3 pontos", "Bola verde")}
-            ${renderBola("marrom.png", "4 pontos", "Bola marrom")}
-            ${renderBola("azul.png", "5 pontos", "Bola azul")}
-            ${renderBola("rosa.png", "6 pontos", "Bola rosa")}
-            ${renderBola("preta.png", "7 pontos", "Bola preta")}
+            ${renderBola("branca.svg", "Tacadeira", "Bola branca")}
+            ${renderBola("vermelha.svg", "1 ponto", "Bola vermelha")}
+            ${renderBola("amarela.svg", "2 pontos", "Bola amarela")}
+            ${renderBola("verde.svg", "3 pontos", "Bola verde")}
+            ${renderBola("marrom.svg", "4 pontos", "Bola marrom")}
+            ${renderBola("azul.svg", "5 pontos", "Bola azul")}
+            ${renderBola("rosa.svg", "6 pontos", "Bola rosa")}
+            ${renderBola("preta.svg", "7 pontos", "Bola preta")}
           </div>
 
           <figure class="rules-map">
             <img
-              src="${withBasePath("/assets/images/regulamento/mapa-regra-brasileira.png")}"
+              src="${withBasePath("/assets/images/regulamento/mapa-regra-brasileira.svg")}"
               alt="Mapa da disposição das bolas na mesa de sinuca brasileira"
             >
             <figcaption>Mesa nacional: 3,10 m × 1,70 m</figcaption>
@@ -69,22 +69,22 @@ export function renderRegulamento() {
               "Bola 5 da vez",
               46,
               [
-                ["preta.png", "N"],
-                ["azul.png", "V"],
-                ["preta.png", "L"],
-                ["preta.png", "N"],
-                ["rosa.png", "V"],
-                ["preta.png", "L"],
-                ["preta.png", "V"],
+                ["preta.svg", "N"],
+                ["azul.svg", "V"],
+                ["preta.svg", "L"],
+                ["preta.svg", "N"],
+                ["rosa.svg", "V"],
+                ["preta.svg", "L"],
+                ["preta.svg", "V"],
               ],
             )}
             ${renderSequence("Bola 6 da vez", 27, [
-              ["preta.png", "N"],
-              ["rosa.png", "V"],
-              ["preta.png", "L"],
-              ["preta.png", "V"],
+              ["preta.svg", "N"],
+              ["rosa.svg", "V"],
+              ["preta.svg", "L"],
+              ["preta.svg", "V"],
             ])}
-            ${renderSequence("Bola 7 da vez", 7, [["preta.png", "V"]])}
+            ${renderSequence("Bola 7 da vez", 7, [["preta.svg", "V"]])}
           </div>
         </div>
       </section>

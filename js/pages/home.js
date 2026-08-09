@@ -14,7 +14,7 @@ ${renderNavbar()}
 
 <main>
   <section class="hero">
-    <img src="${withBasePath("/assets/images/esporte_page-bg.png")}" class="hero-logo" alt="Sinuca" />
+    <img src="${withBasePath("/assets/images/esporte_page-bg.svg")}" class="hero-logo" alt="Sinuca" />
 
     <p class="hero-subtitle" data-home-season>Clube AEC • Temporada ${knownSeason}</p>
 

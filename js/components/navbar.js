@@ -18,7 +18,7 @@ export function renderNavbar({ title = "" } = {}) {
     <div class="header-left">
 
         <img
-            src="${BASE_PATH}/assets/images/logo_branca.png"
+            src="${BASE_PATH}/assets/images/logo_branca.svg"
             alt="AEC"
             data-route="/"
             class="logo"
@@ -43,7 +43,7 @@ export function renderNavbar({ title = "" } = {}) {
           >
             <i class="bi bi-chevron-down division-selector-arrow"></i>
             <img
-              src="${BASE_PATH}/assets/images/esporte_icone_branco.png"
+              src="${BASE_PATH}/assets/images/esporte_icone_branco.svg"
               class="header-center-icon"
               alt=""
             >
@@ -58,7 +58,7 @@ export function renderNavbar({ title = "" } = {}) {
               role="menuitem"
             >
               <img
-                src="${BASE_PATH}/assets/images/esporte_icone_branco.png"
+                src="${BASE_PATH}/assets/images/esporte_icone_branco.svg"
                 class="division-dropdown-icon"
                 alt=""
               >
@@ -70,12 +70,12 @@ export function renderNavbar({ title = "" } = {}) {
         ${
           isAdminPage || isRulesPage || isHistoryPage
             ? `<img
-                src="${BASE_PATH}/assets/images/esporte_branco.png"
+                src="${BASE_PATH}/assets/images/esporte_branco.svg"
                 class="admin-title-logo"
                 alt="Sinuca"
               >`
             : `<img
-                src="${BASE_PATH}/assets/images/esporte_icone_branco.png"
+                src="${BASE_PATH}/assets/images/esporte_icone_branco.svg"
                 class="header-center-icon ${isRulesPage ? "rules-title-icon" : ""}"
                 alt=""
               >

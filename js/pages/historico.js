@@ -77,6 +77,14 @@ async function loadHistorySelection() {
       getEstatisticas(division, season),
     ]);
     if (!roundContent.isConnected) return;
+    if (!stats.total_participantes) {
+      const empty = historyDivisionEmptyState(division);
+      roundContent.innerHTML = `${filters({ rodadas: [], jogadores: [] })}${empty}`;
+      classificationContent.innerHTML = empty;
+      resultsContent.innerHTML = empty;
+      initFilters();
+      return;
+    }
     roundContent.innerHTML = `${filters({ rodadas: rounds, jogadores: getPlayers(rounds) })}${roundList(rounds)}`;
     classificationContent.innerHTML = classificationTable(stats.classificacao);
     resultsContent.innerHTML = resultsTable(stats.jogadores, stats.total_rodadas);
@@ -84,6 +92,10 @@ async function loadHistorySelection() {
   } catch (error) {
     renderHistoryError(error.message || "Não foi possível carregar esta temporada.");
   }
+}
+
+function historyDivisionEmptyState(division) {
+  return `<div class="error-state history-empty-state"><i class="bi bi-info-circle"></i><p>Não há Série ${escapeHtml(division)} registrada nesta temporada.</p></div>`;
 }
 
 function renderHistoryError(message, retry = true) {
