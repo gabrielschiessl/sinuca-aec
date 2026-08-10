@@ -34,9 +34,9 @@ ${renderNavbar()}
     })}
 
     ${menuButton({
-      route: "/regulamento",
+      route: "/regra",
       icon: "bi bi-journal-text",
-      text: "Regulamento",
+      text: "Regra",
     })}
 
     ${menuButton({

@@ -2,7 +2,7 @@ import { renderHome } from "./pages/home.js";
 import { renderSerieA } from "./pages/serieA.js";
 import { renderSerieB } from "./pages/serieB.js";
 import { renderAdministrador } from "./pages/administrador.js";
-import { renderRegulamento } from "./pages/regulamento.js";
+import { renderRegra } from "./pages/regra.js";
 import { renderHistorico } from "./pages/historico.js";
 import { withBasePath, withoutBasePath } from "./config.js";
 
@@ -11,7 +11,7 @@ const routes = {
   "/serie-a": renderSerieA,
   "/serie-b": renderSerieB,
   "/administrador": renderAdministrador,
-  "/regulamento": renderRegulamento,
+  "/regra": renderRegra,
   "/historico": renderHistorico,
 };
 

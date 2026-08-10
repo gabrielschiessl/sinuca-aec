@@ -3,18 +3,19 @@ import { renderFooter } from "../components/footer.js";
 import { tabs } from "../components/tabs.js";
 import { withBasePath } from "../config.js";
 
-export function renderRegulamento() {
+export function renderRegra() {
   const app = document.getElementById("app");
 
   app.innerHTML = `
-    ${renderNavbar({ title: "Regulamento" })}
+    ${renderNavbar({ title: "Regra" })}
     ${tabs([
-      { id: "regulamento", label: "Regulamento", icon: "bi bi-journal-text" },
+      { id: "regra", label: "Regra", icon: "bi bi-journal-text" },
       { id: "bolas", label: "Bolas", icon: "bi bi-circle-fill" },
+      { id: "regulamento", label: "Regulamento", icon: "bi bi-clipboard-check" },
     ])}
 
     <main class="rules-page">
-      <section id="regulamento" class="rules-section">
+      <section id="regra" class="rules-section">
         <div class="rules-intro">
           <i class="bi bi-journal-check" aria-hidden="true"></i>
           <div>
@@ -23,6 +24,22 @@ export function renderRegulamento() {
           </div>
         </div>
         <div class="rules-articles" id="rules-articles">
+          <div class="loading-state" role="status">
+            <div class="loading-spinner" aria-hidden="true"></div>
+            <p>Carregando regra...</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="regulamento" class="rules-section" style="display: none">
+        <div class="rules-intro">
+          <i class="bi bi-clipboard-check" aria-hidden="true"></i>
+          <div>
+            <h1>Regulamento dos Campeonatos</h1>
+            <p>Consulte as normas de organização e disputa das Séries A e B.</p>
+          </div>
+        </div>
+        <div class="rules-articles" id="championship-regulations">
           <div class="loading-state" role="status">
             <div class="loading-spinner" aria-hidden="true"></div>
             <p>Carregando regulamento...</p>
@@ -94,19 +111,20 @@ export function renderRegulamento() {
   `;
 
   initRulesTabs();
-  loadRegulamento();
+  loadRulesContent("rules-articles", "/assets/content/regra.html", "regra");
+  loadRulesContent("championship-regulations", "/assets/content/regulamento.html", "regulamento");
 }
 
-async function loadRegulamento() {
-  const content = document.getElementById("rules-articles");
+async function loadRulesContent(elementId, path, contentName) {
+  const content = document.getElementById(elementId);
   if (!content) return;
 
   try {
     const response = await fetch(
-      withBasePath("/assets/content/regulamento.html"),
+      withBasePath(path),
     );
 
-    if (!response.ok) throw new Error("Regulamento indisponível.");
+    if (!response.ok) throw new Error(`${contentName} indisponível.`);
 
     const html = await response.text();
     if (content.isConnected) content.innerHTML = html;
@@ -116,7 +134,7 @@ async function loadRegulamento() {
     content.innerHTML = `
       <div class="error-state" role="alert">
         <i class="bi bi-exclamation-circle" aria-hidden="true"></i>
-        <p>Não foi possível carregar o regulamento.</p>
+        <p>Não foi possível carregar o ${contentName}.</p>
       </div>`;
   }
 }
@@ -171,7 +189,7 @@ function initRulesTabs() {
       button.classList.add("active");
 
       document
-        .querySelectorAll("#regulamento, #bolas")
+        .querySelectorAll("#regra, #bolas, #regulamento")
         .forEach((section) => (section.style.display = "none"));
 
       document.getElementById(button.dataset.tab).style.display = "block";

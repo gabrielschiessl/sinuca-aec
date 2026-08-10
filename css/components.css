@@ -1881,6 +1881,14 @@ select.score-box {
   line-height: 1.65;
 }
 
+.rules-source-note {
+  margin: 24px 0 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-style: italic;
+  text-align: right;
+}
+
 .rules-list ol {
   margin-top: 10px;
   padding-left: 22px;

@@ -2,7 +2,7 @@ import { BASE_PATH } from "../config.js";
 
 export function renderNavbar({ title = "" } = {}) {
   const isAdminPage = title === "Administrador";
-  const isRulesPage = title === "Regulamento";
+  const isRulesPage = title === "Regra" || title === "Regulamento";
   const isHistoryPage = title === "Histórico";
   const alternateDivision =
     title === "Série A"
