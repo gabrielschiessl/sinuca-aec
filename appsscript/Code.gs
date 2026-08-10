@@ -109,6 +109,14 @@ function doPost(e) {
         validarSessaoAdmin(dados.token);
         return responder(salvarPartidasAdmin(dados));
 
+      case "salvar_data_rodada":
+        validarSessaoAdmin(dados.token);
+        return responder(salvarDataRodadaAdmin(dados));
+
+      case "salvar_datas_rodadas":
+        validarSessaoAdmin(dados.token);
+        return responder(salvarDatasRodadasAdmin(dados));
+
       case "logout":
         encerrarSessaoAdmin(dados.token);
         return responder({ sucesso: true });

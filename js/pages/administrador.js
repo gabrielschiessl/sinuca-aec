@@ -20,6 +20,8 @@ import {
   saveAdminJogadores,
   saveAdminPartidas,
   saveAdminParticipantes,
+  saveAdminRoundDate,
+  saveAdminRoundDates,
   saveAdminTemporada,
   saveAdminTemporadaLegada,
 } from "../api.js";
@@ -327,7 +329,7 @@ function renderDashboard(session) {
   page.querySelector("[data-admin-division]")?.addEventListener("change", (event) => loadAdminMatches(event.target.value, false));
   page.querySelector("[data-admin-round-filter]")?.addEventListener("change", applyAdminMatchFilters);
   page.querySelector("[data-admin-player-filter]")?.addEventListener("change", applyAdminMatchFilters);
-  page.querySelector("[data-save-all]")?.addEventListener("click", () => requestSaveCards(null, page.querySelector("[data-admin-division]").value));
+  page.querySelector("[data-save-all]")?.addEventListener("click", () => saveAllMatchChanges(page.querySelector("[data-admin-division]").value));
   page.querySelectorAll("[data-admin-tool]").forEach((button) => button.addEventListener("click", () => selectAdminTool(button.dataset.adminTool)));
   page.querySelector("[data-participant-division]")?.addEventListener("change", handleParticipantDivisionChange);
   page.querySelector("[data-save-participants]")?.addEventListener("click", saveParticipantChanges);
@@ -413,6 +415,16 @@ function toggleAdminEditMode(event) {
     if (!adminEditMode) select.value = select.dataset.originalPlayer;
     select.disabled = !adminEditMode;
     updateParticipantDirtyState(select.closest("[data-participant-row]"));
+  });
+  dashboard.querySelectorAll("[data-participant-tiebreak]").forEach((input) => {
+    if (!adminEditMode) input.value = input.dataset.originalTiebreak;
+    input.disabled = !adminEditMode;
+    updateParticipantDirtyState(input.closest("[data-participant-row]"));
+  });
+  dashboard.querySelectorAll("[data-round-date]").forEach((input) => {
+    if (!adminEditMode) input.value = input.dataset.originalDate;
+    input.disabled = !adminEditMode;
+    updateRoundDateDirtyState(input.closest("[data-admin-round]"));
   });
   dashboard.querySelector("[data-add-player]").disabled = !adminEditMode;
   const createSeasonButton = dashboard.querySelector("[data-create-season]");
@@ -1448,9 +1460,11 @@ function renderParticipantRow(participante, jogadores) {
     .sort((a, b) => a.exibicao.localeCompare(b.exibicao, "pt-BR"))
     .map((jogador) => `<option value="${jogador.id}" data-player-search="${escapeHtml([jogador.nome, jogador.exibicao, jogador.apelido].filter(Boolean).join(" "))}" ${jogador.id === participante.jogador_id ? "selected" : ""}>${escapeHtml(jogador.exibicao)}${jogador.ativo ? "" : " (inativo)"}</option>`)
     .join("");
-  return `<article class="admin-participant-row" data-participant-row data-number="${participante.numero}">
+  const desempate = participante.desempate || "";
+  return `<article class="admin-participant-row has-tiebreak" data-participant-row data-number="${participante.numero}">
     <span class="admin-participant-number">${participante.numero}</span>
     <label><span>Jogador</span><select class="admin-select" data-participant-select data-original-player="${participante.jogador_id}" ${adminEditMode ? "" : "disabled"}>${options}</select></label>
+    <label class="admin-participant-tiebreak"><span>Desempate</span><input class="admin-input" type="number" min="1" step="1" inputmode="numeric" value="${desempate}" data-participant-tiebreak data-original-tiebreak="${desempate}" aria-label="Prioridade de desempate do participante ${participante.numero}" ${adminEditMode ? "" : "disabled"}></label>
   </article>`;
 }
 
@@ -1458,6 +1472,9 @@ function bindParticipantEvents() {
   getPage()?.querySelectorAll("[data-participant-select]").forEach((select) => {
     select.addEventListener("change", () => updateParticipantDirtyState(select.closest("[data-participant-row]")));
     enhanceSearchablePlayerSelect(select);
+  });
+  getPage()?.querySelectorAll("[data-participant-tiebreak]").forEach((input) => {
+    input.addEventListener("input", () => updateParticipantDirtyState(input.closest("[data-participant-row]")));
   });
 }
 
@@ -1561,7 +1578,8 @@ function syncSearchablePlayerComboboxes(container = document) {
 function updateParticipantDirtyState(row) {
   if (!row) return;
   const select = row.querySelector("[data-participant-select]");
-  row.classList.toggle("is-dirty", select.value !== select.dataset.originalPlayer);
+  const desempate = row.querySelector("[data-participant-tiebreak]");
+  row.classList.toggle("is-dirty", select.value !== select.dataset.originalPlayer || desempate.value !== desempate.dataset.originalTiebreak);
   updateParticipantPendingCount();
 }
 
@@ -1582,8 +1600,15 @@ async function saveParticipantChanges() {
   if (selectedPlayers.some((id, index) => selectedPlayers.indexOf(id) !== index)) {
     return showAdminModal("Jogador duplicado", "Cada jogador pode ocupar somente um número na divisão.", "error");
   }
-  const changes = rows.map((row) => ({ numero: Number(row.dataset.number), jogador_id: Number(row.querySelector("[data-participant-select]").value) }));
-  const summary = rows.map((row) => `Nº ${row.dataset.number}: ${row.querySelector("option:checked").textContent}`).join("; ");
+  const changes = rows.map((row) => ({
+    numero: Number(row.dataset.number),
+    jogador_id: Number(row.querySelector("[data-participant-select]").value),
+    desempate: row.querySelector("[data-participant-tiebreak]").value,
+  }));
+  const summary = rows.map((row) => {
+    const prioridade = row.querySelector("[data-participant-tiebreak]").value;
+    return `Nº ${row.dataset.number}: ${row.querySelector("option:checked").textContent}${prioridade ? ` (desempate ${prioridade})` : ""}`;
+  }).join("; ");
   const confirmed = await confirmAdminChange("Salvar participantes?", `Confira as alterações: ${summary}`);
   if (!confirmed) return;
   const button = page.querySelector("[data-save-participants]");
@@ -1808,6 +1833,7 @@ async function loadAdminMatches(divisao, preserveFilters = true) {
     if (!content.isConnected) return;
     populateAdminMatchFilters(rodadas, previousRound, previousPlayer);
     content.innerHTML = rodadas.map(renderAdminRound).join("");
+    enableSeasonSchedulePickers(content);
     bindAdminMatchEvents(divisao);
     applyAdminMatchFilters();
   } catch (error) {
@@ -1816,7 +1842,18 @@ async function loadAdminMatches(divisao, preserveFilters = true) {
 }
 
 function renderAdminRound(rodada) {
-  return `<section class="admin-round" data-admin-round="${rodada.rodada}"><h3>Rodada ${rodada.rodada}</h3>${rodada.partidas.map(renderAdminMatch).join("")}</section>`;
+  const data = toAdminDateInputValue(rodada.data);
+  return `<section class="admin-round" data-admin-round="${rodada.rodada}">
+    <div class="admin-round-heading"><h3>Rodada ${rodada.rodada}</h3><div class="admin-round-date-controls"><label><span>Data da rodada</span><input class="admin-input" type="date" value="${data}" data-round-date data-original-date="${data}" ${adminEditMode ? "" : "disabled"}></label><button class="btn btn-admin-save" type="button" data-save-round-date disabled>Salvar data</button></div></div>
+    ${rodada.partidas.map(renderAdminMatch).join("")}
+  </section>`;
+}
+
+function toAdminDateInputValue(value) {
+  const text = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const match = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : "";
 }
 
 function populateAdminMatchFilters(rodadas, selectedRound = "", selectedPlayer = "") {
@@ -1887,6 +1924,11 @@ function setAdminMatchObservation(card, value) {
 }
 
 function bindAdminMatchEvents(divisao) {
+  getPage()?.querySelectorAll("[data-admin-round]").forEach((round) => {
+    const input = round.querySelector("[data-round-date]");
+    input?.addEventListener("change", () => updateRoundDateDirtyState(round));
+    round.querySelector("[data-save-round-date]")?.addEventListener("click", () => saveRoundDate(round, divisao));
+  });
   getPage()?.querySelectorAll("[data-admin-match]").forEach((card) => {
     const status = card.querySelector("[data-match-status]");
     const scores = [...card.querySelectorAll("[data-match-score]")];
@@ -1964,17 +2006,90 @@ function bindAdminMatchEvents(divisao) {
   });
 }
 
+function updateRoundDateDirtyState(round) {
+  if (!round) return;
+  const input = round.querySelector("[data-round-date]");
+  const button = round.querySelector("[data-save-round-date]");
+  const dirty = input.value !== input.dataset.originalDate;
+  round.classList.toggle("has-date-change", dirty);
+  if (button) button.disabled = !adminEditMode || !dirty || !input.value;
+  updateAdminMatchPendingState();
+}
+
+async function saveRoundDate(round, divisao) {
+  const input = round.querySelector("[data-round-date]");
+  if (!input.value) return showAdminModal("Data obrigatória", "Informe a nova data da rodada.", "error");
+  const rodada = Number(round.dataset.adminRound);
+  const confirmed = await confirmAdminChange("Alterar data da rodada?", `Todas as partidas da Rodada ${rodada} serão transferidas para a data informada.`);
+  if (!confirmed) return;
+  const button = round.querySelector("[data-save-round-date]");
+  button.disabled = true;
+  try {
+    const result = await saveAdminRoundDate(activeAdminSession.token, divisao, rodada, input.value);
+    input.value = input.dataset.originalDate = result.data;
+    updateRoundDateDirtyState(round);
+    showAdminModal("Data atualizada", `A data da Rodada ${rodada} foi alterada com sucesso.`, "success");
+  } catch (error) {
+    updateRoundDateDirtyState(round);
+    showAdminModal("Não foi possível alterar", error.message, "error");
+  }
+}
+
 function updateCardDirtyState(card) {
   const status = card.querySelector("[data-match-status]").value;
   const scores = [...card.querySelectorAll("[data-match-score]")].map((item) => item.value || "-");
   const observation = card.querySelector("[data-match-observation]")?.textContent || "";
   const dirty = status !== card.dataset.originalStatus || scores[0] !== card.dataset.originalScore1 || scores[1] !== card.dataset.originalScore2 || observation !== card.dataset.originalObservation;
   card.classList.toggle("is-dirty", dirty);
-  const pending = getPage()?.querySelectorAll("[data-admin-match].is-dirty").length || 0;
+  updateAdminMatchPendingState();
+}
+
+function updateAdminMatchPendingState() {
+  const page = getPage();
+  const pendingMatches = page?.querySelectorAll("[data-admin-match].is-dirty").length || 0;
+  const pendingDates = page?.querySelectorAll("[data-admin-round].has-date-change").length || 0;
+  const pending = pendingMatches + pendingDates;
   const label = getPage()?.querySelector("[data-admin-pending-count]");
   const saveAll = getPage()?.querySelector("[data-save-all]");
   if (label) label.textContent = pending ? `${pending} ${pending === 1 ? "alteração pendente" : "alterações pendentes"}` : "Nenhuma alteração pendente";
   if (saveAll) saveAll.disabled = pending === 0 || !adminEditMode;
+}
+
+async function saveAllMatchChanges(divisao) {
+  const page = getPage();
+  const cards = [...page.querySelectorAll("[data-admin-match].is-dirty")];
+  const rounds = [...page.querySelectorAll("[data-admin-round].has-date-change")];
+  if (!cards.length && !rounds.length) return;
+  const invalid = cards.map((card) => ({ card, change: getCardChange(card, divisao) })).find((item) => item.change.error);
+  if (invalid) {
+    invalid.card.classList.add("has-error");
+    return showAdminModal("Confira a partida", invalid.change.error, "error");
+  }
+  if (rounds.some((round) => !round.querySelector("[data-round-date]").value)) {
+    return showAdminModal("Confira as datas", "Todas as rodadas alteradas devem possuir uma data.", "error");
+  }
+  const details = [
+    cards.length ? `${cards.length} ${cards.length === 1 ? "partida alterada" : "partidas alteradas"}` : "",
+    rounds.length ? `${rounds.length} ${rounds.length === 1 ? "data de rodada alterada" : "datas de rodadas alteradas"}` : "",
+  ].filter(Boolean).join(" e ");
+  const confirmed = await confirmAdminChange("Salvar todas as alterações?", `Serão salvas ${details}.`);
+  if (!confirmed) return;
+  const saveAll = page.querySelector("[data-save-all]");
+  saveAll.disabled = true;
+  try {
+    const operations = rounds.length ? [saveAdminRoundDates(activeAdminSession.token, rounds.map((round) => ({
+      divisao,
+      rodada: Number(round.dataset.adminRound),
+      data: round.querySelector("[data-round-date]").value,
+    })))] : [];
+    if (cards.length) operations.unshift(saveAdminPartidas(activeAdminSession.token, cards.map((card) => getCardChange(card, divisao))));
+    await Promise.all(operations);
+    await loadAdminMatches(divisao, true);
+    showAdminModal("Alterações salvas", `Foram salvas ${details} com sucesso.`, "success");
+  } catch (error) {
+    await loadAdminMatches(divisao, true);
+    showAdminModal("Não foi possível salvar tudo", error.message, "error");
+  }
 }
 
 function getCardChange(card, divisao) {

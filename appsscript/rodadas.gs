@@ -174,6 +174,67 @@ function salvarPartidasAdmin(dados) {
   return { sucesso: true, partidas: resultados };
 }
 
+function salvarDataRodadaAdmin(dados) {
+  const temporada = getTemporadaAtual();
+  const divisao = String(dados.divisao || "").trim().toUpperCase();
+  const rodada = Number(dados.rodada);
+  const data = String(dados.data || "").trim();
+  if (!["A", "B"].includes(divisao) || !Number.isInteger(rodada) || rodada < 1) {
+    throw new Error("Rodada inválida ou incompleta.");
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+    throw new Error("Informe uma data válida para a rodada.");
+  }
+  const partes = data.split("-").map(Number);
+  const dataPlanilha = new Date(partes[0], partes[1] - 1, partes[2], 12, 0, 0);
+  if (
+    dataPlanilha.getFullYear() !== partes[0] ||
+    dataPlanilha.getMonth() !== partes[1] - 1 ||
+    dataPlanilha.getDate() !== partes[2]
+  ) {
+    throw new Error("Informe uma data válida para a rodada.");
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const aba = planilha.getSheetByName(SHEETS.rodadas);
+    const valores = aba.getDataRange().getDisplayValues();
+    const cabecalhos = valores[0].map((valor) => String(valor).trim().toLowerCase());
+    const coluna = (nome) => cabecalhos.indexOf(nome);
+    const linhas = [];
+    valores.slice(1).forEach((linha, indice) => {
+      if (
+        Number(linha[coluna("temporada")]) === temporada &&
+        String(linha[coluna("divisao")]).trim().toUpperCase() === divisao &&
+        Number(linha[coluna("rodada")]) === rodada
+      ) linhas.push(indice + 2);
+    });
+    if (!linhas.length) throw new Error("Rodada não encontrada.");
+    linhas.forEach((linha) => {
+      aba.getRange(linha, coluna("data") + 1)
+        .setValue(dataPlanilha)
+        .setNumberFormat("dd/MM/yyyy");
+      const colunaAtualizacao = coluna("atualizado_em");
+      if (colunaAtualizacao >= 0) aba.getRange(linha, colunaAtualizacao + 1).setValue(new Date());
+    });
+    delete CACHE[SHEETS.rodadas];
+    return { sucesso: true, divisao, rodada, data };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function salvarDatasRodadasAdmin(dados) {
+  const rodadas = Array.isArray(dados.rodadas) ? dados.rodadas : [];
+  if (!rodadas.length) throw new Error("Nenhuma data de rodada foi informada.");
+  return {
+    sucesso: true,
+    rodadas: rodadas.map((rodada) => salvarDataRodadaAdmin(rodada)),
+  };
+}
+
 function validarEstadoPartida(statusInformado, placar1Informado, placar2Informado) {
   let status = String(statusInformado || "").trim().toUpperCase();
 

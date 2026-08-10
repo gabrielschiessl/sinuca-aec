@@ -19,6 +19,7 @@ function getParticipante(temporada, divisao, numero) {
 }
 
 function getParticipantesAdmin(divisaoInformada) {
+  garantirEstruturaTemporadas();
   const temporada = getTemporadaAtual();
   const divisao = String(divisaoInformada || "").trim().toUpperCase();
   if (!["A", "B"].includes(divisao)) throw new Error("Divisão inválida.");
@@ -39,6 +40,7 @@ function getParticipantesAdmin(divisaoInformada) {
       divisao,
       numero: Number(participante.numero),
       jogador_id: Number(participante.jogador_id),
+      desempate: normalizarPrioridadeDesempate(participante.desempate),
       jogador: jogadoresPorId[Number(participante.jogador_id)] || null,
     }));
 
@@ -55,6 +57,7 @@ function getParticipantesAdmin(divisaoInformada) {
 }
 
 function salvarParticipantesAdmin(dados) {
+  garantirEstruturaTemporadas();
   const temporada = getTemporadaAtual();
   const divisao = String(dados.divisao || "").trim().toUpperCase();
   const alteracoes = Array.isArray(dados.participantes) ? dados.participantes : [];
@@ -78,6 +81,7 @@ function salvarParticipantesAdmin(dados) {
     if (!Number(alteracao.numero) || !jogadoresValidos.has(Number(alteracao.jogador_id))) {
       throw new Error("Um dos participantes informados é inválido ou está inativo.");
     }
+    alteracao.desempate = normalizarPrioridadeDesempate(alteracao.desempate);
   });
 
   const lock = LockService.getScriptLock();
@@ -104,6 +108,7 @@ function salvarParticipantesAdmin(dados) {
       divisao: String(linha[coluna("divisao")]).trim().toUpperCase(),
       numero: Number(linha[coluna("numero")]),
       jogador_id: Number(linha[coluna("jogador_id")]),
+      desempate: normalizarPrioridadeDesempate(linha[coluna("desempate")]),
     }));
     const idsSubstituidos = new Set();
     alteracoes.forEach((alteracao) => {
@@ -113,6 +118,7 @@ function salvarParticipantesAdmin(dados) {
       }
       idsSubstituidos.add(registro.jogador_id);
       registro.jogador_id = Number(alteracao.jogador_id);
+      registro.desempate = alteracao.desempate;
     });
 
     const idsDuplicados = estadoFinal.map((item) => item.jogador_id).filter((id, indice, lista) => id && lista.indexOf(id) !== indice);
@@ -121,6 +127,7 @@ function salvarParticipantesAdmin(dados) {
     alteracoes.forEach((alteracao) => {
       const registro = porChave[`${divisao}-${Number(alteracao.numero)}`];
       aba.getRange(registro.indice, coluna("jogador_id") + 1).setValue(Number(alteracao.jogador_id));
+      aba.getRange(registro.indice, coluna("desempate") + 1).setValue(alteracao.desempate || "");
     });
 
     const idsVinculados = new Set(estadoFinal.map((item) => item.jogador_id).filter(Boolean));

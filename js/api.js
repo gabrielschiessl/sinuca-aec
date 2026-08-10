@@ -235,3 +235,17 @@ export function saveAdminPartidas(token, partidas) {
       return result;
     });
 }
+
+export function saveAdminRoundDate(token, divisao, rodada, data) {
+  return post({ acao: "salvar_data_rodada", token, divisao, rodada, data }).then((result) => {
+    cache.clear();
+    return result;
+  });
+}
+
+export function saveAdminRoundDates(token, rodadas) {
+  return post({ acao: "salvar_datas_rodadas", token, rodadas }).then((result) => {
+    cache.clear();
+    return result;
+  });
+}
