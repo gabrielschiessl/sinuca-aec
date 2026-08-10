@@ -7,12 +7,15 @@ import { filters } from "../components/filters.js";
 import { initFilters } from "../utils/filterController.js";
 import { classificationTable } from "../components/classificationTable.js";
 import { resultsTable } from "../components/resultsTable.js";
+import { initPdfExportButtons } from "../utils/pdfExporter.js";
+import { getKnownCurrentSeason } from "../config.js";
 
 export async function renderSerie({ divisao, title }) {
   const app = document.getElementById("app");
 
   app.innerHTML = renderPage(title);
   initTabs();
+  initPdfExportButtons(app, () => ({ division: divisao, season: getKnownCurrentSeason() }));
 
   await Promise.all([loadRodadas(divisao), loadEstatisticas(divisao)]);
 }
@@ -141,28 +144,28 @@ function renderPage(title) {
 
     <main class="serie-page">
       <section id="rodadas">
-        <h2 class="section-heading-title">
+        <div class="section-heading-actions"><h2 class="section-heading-title">
           <i class="bi bi-calendar3"></i>
           Rodadas
-        </h2>
+        </h2><button class="btn pdf-export-button" type="button" data-pdf-export="rounds" data-pdf-source="#round-panel-content"><i class="bi bi-file-earmark-pdf"></i> Exportar PDF</button></div>
         <div class="round-panel">
           <div id="round-panel-content"></div>
         </div>
       </section>
 
       <section id="classificacao" style="display: none">
-        <h2 class="section-heading-title">
+        <div class="section-heading-actions"><h2 class="section-heading-title">
           <i class="bi bi-bar-chart-steps"></i>
           Classificação
-        </h2>
+        </h2><button class="btn pdf-export-button" type="button" data-pdf-export="classification" data-pdf-source="#classification-content"><i class="bi bi-file-earmark-pdf"></i> Exportar PDF</button></div>
         <div class="stats-panel" id="classification-content"></div>
       </section>
 
       <section id="resultados" style="display: none">
-        <h2 class="section-heading-title">
+        <div class="section-heading-actions"><h2 class="section-heading-title">
           <i class="bi bi-clipboard-data"></i>
           Resultados
-        </h2>
+        </h2><button class="btn pdf-export-button" type="button" data-pdf-export="results" data-pdf-source="#results-content"><i class="bi bi-file-earmark-pdf"></i> Exportar PDF</button></div>
         <div class="stats-panel" id="results-content"></div>
       </section>
 
