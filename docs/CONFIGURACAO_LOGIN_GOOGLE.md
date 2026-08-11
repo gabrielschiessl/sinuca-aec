@@ -7,6 +7,7 @@ No cliente OAuth do tipo **Aplicativo da Web**, use:
 - Origem JavaScript: `http://localhost:5500`
 - Origem JavaScript: `http://127.0.0.1:5500`
 - Origem JavaScript: `https://gabrielschiessl.github.io`
+- Origem JavaScript: `https://netzup.com.br`
 
 O Google Identity Services usado pelo projeto não exige URI de redirecionamento.
 

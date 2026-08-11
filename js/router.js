@@ -5,6 +5,9 @@ import { renderAdministrador } from "./pages/administrador.js";
 import { renderRegra } from "./pages/regra.js";
 import { renderHistorico } from "./pages/historico.js";
 import { withBasePath, withoutBasePath } from "./config.js";
+import { resetPageScroll } from "./utils/pageScroll.js";
+
+export { resetPageScroll };
 
 const routes = {
   "/": renderHome,
@@ -24,7 +27,11 @@ export function router() {
 }
 
 export function navigate(path) {
-  window.history.pushState({}, "", withBasePath(path));
+  window.history.pushState(
+    {},
+    "",
+    `${withBasePath(path)}${window.location.search}`,
+  );
 
   router();
   resetPageScroll();
@@ -35,13 +42,6 @@ window.addEventListener("popstate", () => {
   router();
   resetPageScroll();
 });
-
-export function resetPageScroll() {
-  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  requestAnimationFrame(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  });
-}
 
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-route]");

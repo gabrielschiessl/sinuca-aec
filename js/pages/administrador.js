@@ -26,6 +26,7 @@ import {
   saveAdminTemporadaLegada,
 } from "../api.js";
 import { setKnownCurrentSeason, withBasePath } from "../config.js";
+import { resetPageScroll } from "../utils/pageScroll.js";
 
 const PAGE_ID = "admin-page";
 const CREATE_SEASON_BUTTON_HTML = '<i class="bi bi-plus-circle"></i> Criar temporada';
@@ -375,6 +376,7 @@ function selectAdminTool(tool) {
   if (tool === "temporadas" && !page.querySelector("[data-admin-seasons]").dataset.loaded) {
     loadAdminSeasons();
   }
+  resetPageScroll();
 }
 
 function toggleAdminEditMode(event) {
@@ -604,8 +606,21 @@ async function readLegacySeasonSpreadsheet(file, players) {
     if (!participantNumbers.has(number1) || !participantNumbers.has(number2) || number1 === number2) {
       throw new Error(`Partidas, linha ${line}: os números dos jogadores são inválidos.`);
     }
-    const placar1 = normalizeImportedScore(row.placar1, line);
-    const placar2 = normalizeImportedScore(row.placar2, line);
+    const importedScore = normalizeImportedScorePair(row.placar1, row.placar2, line);
+    const placar1 = importedScore.placar1;
+    const placar2 = importedScore.placar2;
+    const loserNumber = importedScore.woLoser === 1 ? number1 : importedScore.woLoser === 2 ? number2 : null;
+    const loser = loserNumber === null
+      ? null
+      : participantes[division].find((item) => item.numero === loserNumber);
+    const loserPlayer = loser
+      ? players.find((player) => Number(player.id) === Number(loser.jogador_id))
+      : null;
+    const importedObservation = importedScore.woBoth
+      ? "W.O.: ambos abandonaram a competição"
+      : loserPlayer
+        ? `W.O.: ${loserPlayer.exibicao}`
+        : String(row.observacao || "").trim();
     if (!roundMaps[division].has(roundNumber)) {
       roundMaps[division].set(roundNumber, { rodada: roundNumber, tipo: "REGULAR", folga: null, partidas: [] });
     }
@@ -617,7 +632,7 @@ async function readLegacySeasonSpreadsheet(file, players) {
       status: "E",
       placar1,
       placar2,
-      observacao: String(row.observacao || "").trim(),
+      observacao: importedObservation,
     });
   });
 
@@ -679,6 +694,57 @@ function normalizeImportedScore(value, line) {
   const score = Number(value);
   if (!Number.isInteger(score) || score < 0 || score > 2) throw new Error(`Partidas, linha ${line}: placar inválido.`);
   return String(score);
+}
+
+function normalizeImportedScorePair(value1, value2, line) {
+  const compact1 = normalizeImportedWalkoverToken(value1);
+  const compact2 = normalizeImportedWalkoverToken(value2);
+  const combined1 = compact1.match(/^(W|0)X(W|0)$/);
+  const combined2 = compact2.match(/^(W|0)X(W|0)$/);
+  if (combined1 || combined2) {
+    const combined = combined1 || combined2;
+    const otherValue = combined1 ? value2 : value1;
+    if (String(otherValue ?? "").trim() !== "") {
+      throw new Error(`Partidas, linha ${line}: informe o W.O. compacto em apenas uma das colunas de placar.`);
+    }
+    return normalizeImportedWalkoverPair(combined[1], combined[2], line);
+  }
+
+  const token1 = compact1 === "W" ? "W" : value1;
+  const token2 = compact2 === "W" ? "W" : value2;
+  if (token1 === "W" || token2 === "W") {
+    return normalizeImportedWalkoverPair(token1, token2, line);
+  }
+  return {
+    placar1: normalizeImportedScore(value1, line),
+    placar2: normalizeImportedScore(value2, line),
+    woLoser: null,
+    woBoth: false,
+  };
+}
+
+function normalizeImportedWalkoverToken(value) {
+  return String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace(/W\.O\.?|WO/g, "W")
+    .replace(/×/g, "X");
+}
+
+function normalizeImportedWalkoverPair(value1, value2, line) {
+  const token1 = normalizeImportedWalkoverToken(value1);
+  const token2 = normalizeImportedWalkoverToken(value2);
+  if (token1 === "W" && token2 === "W") {
+    return { placar1: "0", placar2: "0", woLoser: null, woBoth: true };
+  }
+  if (token1 === "W" && token2 === "0") {
+    return { placar1: "2", placar2: "0", woLoser: 2, woBoth: false };
+  }
+  if (token1 === "0" && token2 === "W") {
+    return { placar1: "0", placar2: "2", woLoser: 1, woBoth: false };
+  }
+  throw new Error(`Partidas, linha ${line}: use W x 0, 0 x W ou W x W para registrar W.O.`);
 }
 
 function normalizeImportedDate(value, line) {
@@ -895,6 +961,7 @@ function handleSeasonScheduleOpen(event) {
 
 function requestSeasonScheduleStart(division, details) {
   document.querySelector(".admin-modal-backdrop")?.remove();
+  const legacy = seasonDraft.modo === "LEGADA";
   const firstRound = seasonDraft.rodadas?.[division]?.[0];
   const initialTime = firstRound
     ? getCommonSeasonRoundValue(firstRound, "hora") || "19:00"
@@ -904,7 +971,9 @@ function requestSeasonScheduleStart(division, details) {
   modal.innerHTML = `<div class="admin-modal admin-season-start-modal" role="dialog" aria-modal="true">
     <i class="bi bi-calendar2-week"></i>
     <h2>Início da Série ${division}</h2>
-    <p>Informe a data e o horário da primeira rodada. As próximas datas serão distribuídas automaticamente entre terças e quintas.</p>
+    <p>${legacy
+      ? "Informe a data e o horário da primeira rodada. As demais rodadas poderão ser ajustadas individualmente."
+      : "Informe a data e o horário da primeira rodada. A partir da rodada seguinte, as datas serão distribuídas automaticamente entre as próximas terças e quintas."}</p>
     <div class="admin-season-start-fields">
       <label><span>Data de início</span><input class="admin-input" type="date" data-season-start-date required></label>
       <label><span>Horário</span><input class="admin-input" type="time" value="${escapeHtml(initialTime)}" data-season-start-time required></label>
@@ -919,7 +988,7 @@ function requestSeasonScheduleStart(division, details) {
   modal.querySelector("[data-cancel]").addEventListener("click", () => modal.remove());
   modal.querySelector("[data-confirm]").addEventListener("click", () => {
     const firstDate = parseSeasonDate(dateInput.value);
-    if (!firstDate || ![2, 4].includes(firstDate.getDay())) {
+    if (!firstDate) {
       showSeasonStartDateError(modal, dateInput);
       return;
     }
@@ -928,7 +997,14 @@ function requestSeasonScheduleStart(division, details) {
       return;
     }
     seasonDraft.rodadas = getEffectiveSeasonSchedules();
-    fillSeasonTuesdayThursdayCalendar(division, firstDate);
+    if (legacy) {
+      const formatted = formatSeasonDate(firstDate);
+      seasonDraft.rodadas[division][0].partidas.forEach((match) => {
+        match.data = formatted;
+      });
+    } else {
+      fillSeasonCalendar(division, firstDate);
+    }
     seasonDraft.rodadas[division][0].partidas.forEach((match) => {
       match.hora = timeInput.value;
     });
@@ -946,7 +1022,7 @@ function showSeasonStartDateError(startModal, dateInput) {
   errorModal.innerHTML = `<div class="admin-modal" role="alertdialog" aria-modal="true">
     <i class="bi bi-exclamation-triangle"></i>
     <h2>Data inicial inválida</h2>
-    <p>A primeira rodada deve começar em uma terça-feira ou quinta-feira.</p>
+    <p>Informe uma data válida para a primeira rodada.</p>
     <button class="btn" type="button">Entendi</button>
   </div>`;
   document.body.appendChild(errorModal);
@@ -1010,19 +1086,18 @@ function updateSeasonRoundField(event) {
   const round = rounds?.[roundIndex];
   if (!round) return;
 
-  if (field === "data" && roundIndex === 0 && input.value) {
+  if (seasonDraft.modo !== "LEGADA" && field === "data" && roundIndex === 0 && input.value) {
     const firstDate = parseSeasonDate(input.value);
-    const weekday = firstDate?.getDay();
-    if (![2, 4].includes(weekday)) {
+    if (!firstDate) {
       input.value = getCommonSeasonRoundValue(round, "data");
       showAdminModal(
         "Data inicial inválida",
-        "A primeira rodada deve começar em uma terça-feira ou quinta-feira.",
+        "Informe uma data válida para a primeira rodada.",
         "error",
       );
       return;
     }
-    fillSeasonTuesdayThursdayCalendar(division, firstDate);
+    fillSeasonCalendar(division, firstDate);
     updateSeasonScheduleInputs(division);
   } else {
     round.partidas.forEach((match) => {
@@ -1033,16 +1108,24 @@ function updateSeasonRoundField(event) {
   getPage()?.querySelector("[data-season-editor]")?.classList.toggle("is-dirty", isSeasonDirty());
 }
 
-function fillSeasonTuesdayThursdayCalendar(division, firstDate) {
+function fillSeasonCalendar(division, firstDate) {
   let date = new Date(firstDate);
-  seasonDraft.rodadas[division].forEach((round) => {
+  seasonDraft.rodadas[division].forEach((round, index) => {
+    if (index > 0) date = getNextSeasonTuesdayOrThursday(date);
     const formatted = formatSeasonDate(date);
     round.partidas.forEach((match) => {
       match.data = formatted;
       match.hora = match.hora || "19:00";
     });
-    date.setDate(date.getDate() + (date.getDay() === 2 ? 2 : 5));
   });
+}
+
+function getNextSeasonTuesdayOrThursday(informedDate) {
+  const date = new Date(informedDate);
+  do {
+    date.setDate(date.getDate() + 1);
+  } while (![2, 4].includes(date.getDay()));
+  return date;
 }
 
 function parseSeasonDate(value) {

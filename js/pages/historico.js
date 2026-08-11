@@ -8,6 +8,7 @@ import { resultsTable } from "../components/resultsTable.js";
 import { initFilters } from "../utils/filterController.js";
 import { getEstatisticas, getRodadas, getTemporadas } from "../api.js";
 import { initPdfExportButtons } from "../utils/pdfExporter.js";
+import { resetPageScroll } from "../utils/pageScroll.js";
 
 export async function renderHistorico() {
   const app = document.getElementById("app");
@@ -127,6 +128,7 @@ function initHistoryTabs(app) {
       ["historico-rodadas", "historico-classificacao", "historico-resultados"].forEach((id) => {
         app.querySelector(`#${id}`).style.display = id === button.dataset.tab ? "block" : "none";
       });
+      resetPageScroll();
     });
   });
 }

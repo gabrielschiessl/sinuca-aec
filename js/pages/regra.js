@@ -2,6 +2,7 @@ import { renderNavbar } from "../components/navbar.js";
 import { renderFooter } from "../components/footer.js";
 import { tabs } from "../components/tabs.js";
 import { withBasePath } from "../config.js";
+import { resetPageScroll } from "../utils/pageScroll.js";
 
 export function renderRegra() {
   const app = document.getElementById("app");
@@ -193,7 +194,7 @@ function initRulesTabs() {
         .forEach((section) => (section.style.display = "none"));
 
       document.getElementById(button.dataset.tab).style.display = "block";
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      resetPageScroll();
     });
   });
 }

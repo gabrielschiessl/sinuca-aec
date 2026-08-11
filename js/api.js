@@ -1,6 +1,17 @@
-const API_URL =
-  "https://script.google.com/macros/s/AKfycbzQEJ5hbg5DjhhYRmakCJuC3DO16uwYP6lP0D5zYhKbuAIe4471Zfs6DiytrL2looie/exec"; //original
-  // "https://script.google.com/macros/s/AKfycbwrXgGHzNFPg8dkRSohBQ_zzuY_fm1PAjChEWtQZLcvTGjHg2fdEljBNaO_a746Df4i/exec"; //testes
+const APPS_SCRIPT_QAS_API_URL =
+  "https://script.google.com/macros/s/AKfycbzQEJ5hbg5DjhhYRmakCJuC3DO16uwYP6lP0D5zYhKbuAIe4471Zfs6DiytrL2looie/exec";
+  // "https://script.google.com/macros/s/AKfycbwrXgGHzNFPg8dkRSohBQ_zzuY_fm1PAjChEWtQZLcvTGjHg2fdEljBNaO_a746Df4i/exec";
+const MYSQL_API_URL = new URL("../api/", import.meta.url).href;
+const requestedApi = new URLSearchParams(window.location.search)
+  .get("api")
+  ?.trim()
+  .toLowerCase();
+const API_BACKEND = ["appscript", "apps-script"].includes(requestedApi)
+  ? "appscript"
+  : "mysql";
+const API_URL = API_BACKEND === "appscript"
+  ? APPS_SCRIPT_QAS_API_URL
+  : MYSQL_API_URL;
 
 
 const CACHE_TTL = 60_000;
@@ -14,15 +25,13 @@ async function request(acao, params = {}) {
   });
 
   const response = await fetch(`${API_URL}?${query}`);
-
-  if (!response.ok) {
-    throw new Error("Erro ao acessar a API.");
-  }
-
-  const data = await response.json();
+  const data = await response.json().catch(() => null);
 
   if (data?.erro) {
     throw new Error(data.erro);
+  }
+  if (!response.ok || !data) {
+    throw new Error("Erro ao acessar a API.");
   }
 
   return data;
@@ -36,15 +45,13 @@ async function post(data) {
     },
     body: JSON.stringify(data),
   });
-
-  if (!response.ok) {
-    throw new Error("Erro ao acessar a API.");
-  }
-
-  const result = await response.json();
+  const result = await response.json().catch(() => null);
 
   if (result?.erro) {
     throw new Error(result.erro);
+  }
+  if (!response.ok || !result) {
+    throw new Error("Erro ao acessar a API.");
   }
 
   return result;

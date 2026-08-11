@@ -643,9 +643,6 @@ function validarAgendaPublicacaoTemporada(rodadas) {
         if (!data || !partida.hora) {
           throw new Error(`Preencha a data e o horário de todas as partidas da Série ${divisao}.`);
         }
-        if (![2, 4].includes(data.getDay())) {
-          throw new Error(`As partidas da Série ${divisao} devem ocorrer às terças ou quintas-feiras.`);
-        }
       });
     });
   });

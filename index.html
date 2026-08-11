@@ -8,7 +8,8 @@
 
     <link rel="icon" href="assets/icons/favicon.ico" />
     <script>
-      const restoredRoute = new URLSearchParams(window.location.search).get("route");
+      const routeParams = new URLSearchParams(window.location.search);
+      const restoredRoute = routeParams.get("route");
       const basePath =
         window.location.hostname === "127.0.0.1" ||
         window.location.hostname === "localhost"
@@ -16,10 +17,12 @@
           : "/sinuca-aec";
 
       if (restoredRoute) {
+        routeParams.delete("route");
+        const remainingQuery = routeParams.toString();
         window.history.replaceState(
           {},
           "",
-          `${basePath}${restoredRoute}${window.location.hash}`,
+          `${basePath}${restoredRoute}${remainingQuery ? `?${remainingQuery}` : ""}${window.location.hash}`,
         );
       }
     </script>

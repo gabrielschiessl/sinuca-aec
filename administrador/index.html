@@ -11,9 +11,9 @@
           ? ""
           : "/sinuca-aec";
 
-      window.location.replace(
-        `${basePath}/?route=${encodeURIComponent("/administrador")}`,
-      );
+      const params = new URLSearchParams(window.location.search);
+      params.set("route", "/administrador");
+      window.location.replace(`${basePath}/?${params.toString()}${window.location.hash}`);
     </script>
   </head>
   <body></body>

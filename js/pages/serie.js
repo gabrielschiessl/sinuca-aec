@@ -9,6 +9,7 @@ import { classificationTable } from "../components/classificationTable.js";
 import { resultsTable } from "../components/resultsTable.js";
 import { initPdfExportButtons } from "../utils/pdfExporter.js";
 import { getKnownCurrentSeason } from "../config.js";
+import { resetPageScroll } from "../utils/pageScroll.js";
 
 export async function renderSerie({ divisao, title }) {
   const app = document.getElementById("app");
@@ -189,6 +190,7 @@ function initTabs() {
         .forEach((section) => (section.style.display = "none"));
 
       document.getElementById(tab).style.display = "block";
+      resetPageScroll();
     });
   });
 }

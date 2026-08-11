@@ -11,7 +11,9 @@
           ? ""
           : "/sinuca-aec";
 
-      window.location.replace(`${basePath}/?route=${encodeURIComponent("/serie-b")}`);
+      const params = new URLSearchParams(window.location.search);
+      params.set("route", "/serie-b");
+      window.location.replace(`${basePath}/?${params.toString()}${window.location.hash}`);
     </script>
   </head>
   <body></body>
