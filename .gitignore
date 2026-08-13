@@ -5,3 +5,4 @@ database/backups/
 database/*snapshot*.json
 database/import_generated.sql
 .vscode/settings.json
+.tmp

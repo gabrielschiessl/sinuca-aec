@@ -92,6 +92,130 @@ final class PublicService
         );
     }
 
+    public function ranking(): array
+    {
+        $currentYear = $this->currentSeason();
+        $configured = $this->db->query(
+            "SELECT setting_value FROM settings WHERE setting_key = 'ranking_reference_year'"
+        )->fetchColumn();
+        $referenceYear = $configured !== false && ctype_digit((string) $configured)
+            ? (int) $configured
+            : $currentYear - 1;
+
+        $seasonStatement = $this->db->prepare(<<<'SQL'
+            SELECT DISTINCT s.year
+            FROM seasons s
+            JOIN participants p ON p.season_id = s.id AND p.division = 'A'
+            WHERE s.status IN ('ATIVA', 'ARQUIVADA') AND s.year <= :reference_year
+            GROUP BY s.id, s.year
+            HAVING COUNT(p.id) >= 2
+            ORDER BY s.year
+        SQL);
+        $seasonStatement->execute(['reference_year' => $referenceYear]);
+        $seasonYears = array_map('intval', $seasonStatement->fetchAll(PDO::FETCH_COLUMN));
+        $classifications = [];
+        $players = [];
+
+        foreach ($seasonYears as $year) {
+            $statistics = StatisticsCalculator::calculate(
+                $year,
+                'A',
+                $this->participants($year, 'A'),
+                $this->finishedMatches($year, 'A'),
+                $this->totalRounds($year, 'A'),
+            );
+            $total = count($statistics['classificacao']);
+            foreach ($statistics['classificacao'] as $index => $player) {
+                $playerId = (int) $player['jogador_id'];
+                $players[$playerId] = [
+                    'jogador_id' => $playerId,
+                    'nome' => $player['nome'],
+                    'exibicao' => $player['exibicao'],
+                    'apelido' => $player['apelido'],
+                ];
+                $classifications[$year][$playerId] = [
+                    'posicao' => $index + 1,
+                    'pontos' => $total - $index,
+                ];
+            }
+        }
+
+        $previousRanking = [];
+        $ranking = [];
+        $firstEvaluationYear = $seasonYears ? min($seasonYears) : $referenceYear;
+        foreach (range($firstEvaluationYear, $referenceYear) as $evaluationYear) {
+            $windowStart = $evaluationYear - 4;
+            $points = [];
+            foreach ($classifications as $seasonYear => $classification) {
+                if ($seasonYear < $windowStart || $seasonYear > $evaluationYear) {
+                    continue;
+                }
+                foreach ($classification as $playerId => $result) {
+                    $points[$playerId] = ($points[$playerId] ?? 0) + $result['pontos'];
+                }
+            }
+            $candidateIds = array_values(array_unique([
+                ...array_keys($points),
+                ...array_keys($previousRanking),
+            ]));
+            usort($candidateIds, function (int $playerA, int $playerB) use ($points, $previousRanking, $players): int {
+                $difference = ($points[$playerB] ?? 0) <=> ($points[$playerA] ?? 0);
+                if ($difference !== 0) {
+                    return $difference;
+                }
+                $previousA = $previousRanking[$playerA] ?? PHP_INT_MAX;
+                $previousB = $previousRanking[$playerB] ?? PHP_INT_MAX;
+                if ($previousA !== $previousB) {
+                    return $previousA <=> $previousB;
+                }
+                $nameDifference = strcasecmp(
+                    (string) ($players[$playerA]['exibicao'] ?? ''),
+                    (string) ($players[$playerB]['exibicao'] ?? ''),
+                );
+                return $nameDifference !== 0 ? $nameDifference : $playerA <=> $playerB;
+            });
+            $candidateIds = array_slice($candidateIds, 0, 30);
+            $previousRanking = [];
+            foreach ($candidateIds as $index => $playerId) {
+                $previousRanking[$playerId] = $index + 1;
+            }
+            if ($evaluationYear === $referenceYear) {
+                $ranking = $candidateIds;
+            }
+        }
+
+        $period = range($referenceYear - 4, $referenceYear);
+        $rows = [];
+        foreach ($ranking as $index => $playerId) {
+            $seasons = [];
+            $totalPoints = 0;
+            foreach ($period as $year) {
+                $result = $classifications[$year][$playerId] ?? null;
+                $points = (int) ($result['pontos'] ?? 0);
+                $totalPoints += $points;
+                $seasons[] = [
+                    'temporada' => $year,
+                    'posicao' => $result['posicao'] ?? null,
+                    'pontos' => $points,
+                ];
+            }
+            $rows[] = [
+                'posicao' => $index + 1,
+                ...$players[$playerId],
+                'pontos' => $totalPoints,
+                'temporadas' => $seasons,
+            ];
+        }
+
+        return [
+            'temporada_atual' => $currentYear,
+            'referencia' => $referenceYear,
+            'referencia_automatica' => !($configured !== false && ctype_digit((string) $configured)),
+            'periodo' => $period,
+            'ranking' => $rows,
+        ];
+    }
+
     public function currentSeason(): int
     {
         $value = $this->db->query("SELECT setting_value FROM settings WHERE setting_key = 'temporada_atual'")

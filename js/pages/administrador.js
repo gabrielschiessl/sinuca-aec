@@ -12,6 +12,7 @@ import {
   getAdminParticipantes,
   getAdminTemporada,
   getAdminTemporadas,
+  getAdminDadosPlanilha,
   prepareAdminTemporada,
   prepareAdminTemporadaLegada,
   publishAdminTemporadaLegada,
@@ -24,9 +25,12 @@ import {
   saveAdminRoundDates,
   saveAdminTemporada,
   saveAdminTemporadaLegada,
+  saveAdminTaxaInscricao,
+  saveAdminRankingReference,
 } from "../api.js";
 import { setKnownCurrentSeason, withBasePath } from "../config.js";
 import { resetPageScroll } from "../utils/pageScroll.js";
+import { exportChampionshipSpreadsheet } from "../utils/championshipSpreadsheet.js";
 
 const PAGE_ID = "admin-page";
 const CREATE_SEASON_BUTTON_HTML = '<i class="bi bi-plus-circle"></i> Criar temporada';
@@ -39,6 +43,9 @@ let seasonDraft = null;
 let savedSeasonDraft = null;
 let searchablePlayerSelectsBound = false;
 let xlsxLibraryPromise = null;
+let legacySpreadsheetTarget = "new";
+let spreadsheetSeasons = [];
+let spreadsheetCurrentSeason = null;
 
 window.addEventListener("beforeunload", (event) => {
   if (!isSeasonDirty()) return;
@@ -171,6 +178,25 @@ async function handleGoogleCredential(response) {
   }
 }
 
+function spreadsheetGroup(key, title, icon, items) {
+  return `
+    <details class="admin-spreadsheet-group" data-spreadsheet-group="${key}" open>
+      <summary>
+        <span><i class="bi ${icon}" aria-hidden="true"></i> ${title}</span>
+        <i class="bi bi-chevron-down" aria-hidden="true"></i>
+      </summary>
+      <div class="admin-spreadsheet-options">
+        ${items.map(([value, label, restriction = ""]) => `
+          <label data-spreadsheet-restriction="${restriction}">
+            <input type="checkbox" value="${value}" data-spreadsheet-sheet checked>
+            <span>${label}</span>
+          </label>
+        `).join("")}
+      </div>
+    </details>
+  `;
+}
+
 function renderDashboard(session) {
   const page = getPage();
   if (!page) return;
@@ -218,6 +244,7 @@ function renderDashboard(session) {
         <button type="button" data-admin-tool="participantes"><i class="bi bi-people-fill"></i> Participantes</button>
         <button type="button" data-admin-tool="jogadores"><i class="bi bi-person-badge-fill"></i> Jogadores</button>
         <button type="button" data-admin-tool="temporadas"><i class="bi bi-calendar2-plus-fill"></i> Temporadas</button>
+        <button type="button" data-admin-tool="planilhas"><i class="bi bi-file-earmark-spreadsheet-fill"></i> Planilhas</button>
       </nav>
 
       <section class="admin-matches-module" data-admin-tool-section="partidas">
@@ -304,6 +331,11 @@ function renderDashboard(session) {
           <div><h2>Temporadas</h2><p>Prepare uma nova temporada sem alterar o campeonato atualmente publicado.</p></div>
         </div>
         <p class="admin-module-note"><i class="bi bi-shield-check"></i> Os dados ficam separados até a futura ativação. Jogadores, partidas e temporada atual não serão alterados nesta etapa.</p>
+        <div class="admin-ranking-reference">
+          <div><strong>Referência do Ranking</strong><span>Define a temporada final da janela de cinco edições da Série A.</span></div>
+          <select class="admin-select" data-ranking-reference disabled></select>
+          <button class="btn btn-admin-secondary" type="button" data-save-ranking-reference disabled>Salvar referência</button>
+        </div>
         <div data-admin-seasons></div>
         <div class="admin-season-create" data-season-create>
           <label><span>Ano da nova temporada</span><select class="admin-select" data-season-year></select></label>
@@ -319,6 +351,27 @@ function renderDashboard(session) {
         </div>
         <p class="admin-season-import-note">A temporada passada somente será enviada ao sistema depois da importação, revisão e confirmação em <strong>Salvar rascunho</strong>.</p>
         <div data-season-editor hidden></div>
+      </section>
+
+      <section class="admin-spreadsheets-module" data-admin-tool-section="planilhas" hidden>
+        <div class="admin-module-heading">
+          <div><h2>Planilhas do campeonato</h2><p>Gere somente as folhas necessárias para impressão e uso no salão de jogos.</p></div>
+        </div>
+        <div class="admin-spreadsheet-config">
+          <label><span>Temporada</span><select class="admin-select" data-spreadsheet-season></select></label>
+          <label><span>Divisão</span><select class="admin-select" data-spreadsheet-division><option value="A">Série A</option><option value="B">Série B</option></select></label>
+          <label><span>Versão</span><select class="admin-select" data-spreadsheet-version><option value="updated">Atualizada</option><option value="manual">Para preenchimento manual</option></select></label>
+          <label><span>Taxa de inscrição (R$)</span><div class="admin-spreadsheet-fee"><input class="admin-input" type="number" min="0" step="0.01" inputmode="decimal" data-spreadsheet-fee><button class="btn btn-admin-secondary" type="button" data-save-spreadsheet-fee disabled>Salvar taxa</button></div></label>
+        </div>
+        <p class="admin-module-note" data-spreadsheet-version-note><i class="bi bi-info-circle"></i> A versão atualizada utiliza o estado atual do banco de dados.</p>
+        <div class="admin-spreadsheet-actions"><button class="btn btn-admin-secondary" type="button" data-spreadsheet-select-all>Selecionar todas</button><button class="btn btn-admin-secondary" type="button" data-spreadsheet-clear>Limpar seleção</button></div>
+        <div class="admin-spreadsheet-groups">
+          ${spreadsheetGroup("cadastros", "Cadastros", "bi-person-vcard-fill", [["jogadores", "Jogadores"], ["inscricao", "Ficha de inscrição"]])}
+          ${spreadsheetGroup("estatisticas", "Estatísticas", "bi-bar-chart-fill", [["classificacao", "Classificação", "updated-only"], ["vitorias", "Vitórias"], ["resultados", "Resultados"], ["partidas", "Partidas vencidas"]])}
+          ${spreadsheetGroup("jogos", "Jogos", "bi-calendar3", [["rodadas", "Rodadas (todas as folhas)"], ["individuais", "Fichas individuais"]])}
+          <details class="admin-spreadsheet-group" data-spreadsheet-final-group hidden><summary><span><i class="bi bi-trophy-fill"></i> Documentos finais</span><i class="bi bi-chevron-down"></i></summary><div></div></details>
+        </div>
+        <div class="admin-season-actions"><button class="btn" type="button" data-generate-spreadsheet><i class="bi bi-download"></i> Gerar planilha</button></div>
       </section>
 
     </section>
@@ -342,6 +395,9 @@ function renderDashboard(session) {
   page.querySelector("[data-create-season]")?.addEventListener("click", createSeasonDraft);
   page.querySelector("[data-create-legacy-season]")?.addEventListener("click", selectLegacySeasonSpreadsheet);
   page.querySelector("[data-season-legacy-file]")?.addEventListener("change", importLegacySeasonSpreadsheet);
+  page.querySelector("[data-ranking-reference]")?.addEventListener("change", updateRankingReferenceButton);
+  page.querySelector("[data-save-ranking-reference]")?.addEventListener("click", saveRankingReference);
+  bindSpreadsheetModule(page);
   loadAdminMatches("A", false);
 }
 
@@ -375,6 +431,9 @@ function selectAdminTool(tool) {
   }
   if (tool === "temporadas" && !page.querySelector("[data-admin-seasons]").dataset.loaded) {
     loadAdminSeasons();
+  }
+  if (tool === "planilhas" && !page.querySelector("[data-spreadsheet-season]").dataset.loaded) {
+    loadSpreadsheetModule();
   }
   resetPageScroll();
 }
@@ -434,6 +493,9 @@ function toggleAdminEditMode(event) {
   dashboard.querySelectorAll("[data-season-editor] select, [data-season-editor] input, [data-season-editor] button").forEach((field) => {
     field.disabled = !adminEditMode;
   });
+  const rankingReference = dashboard.querySelector("[data-ranking-reference]");
+  if (rankingReference) rankingReference.disabled = !adminEditMode;
+  updateRankingReferenceButton();
   dashboard.querySelectorAll("[data-player-row]").forEach((row) => {
     if (!adminEditMode && row.dataset.new === "true") {
       row.remove();
@@ -447,6 +509,149 @@ function toggleAdminEditMode(event) {
   });
   syncSearchablePlayerComboboxes(dashboard);
   updatePlayerPendingCount();
+  updateSpreadsheetConfiguration();
+}
+
+function bindSpreadsheetModule(page) {
+  page.querySelector("[data-spreadsheet-season]")?.addEventListener("change", updateSpreadsheetConfiguration);
+  page.querySelector("[data-spreadsheet-division]")?.addEventListener("change", updateSpreadsheetConfiguration);
+  page.querySelector("[data-spreadsheet-version]")?.addEventListener("change", updateSpreadsheetConfiguration);
+  page.querySelector("[data-spreadsheet-fee]")?.addEventListener("input", updateSpreadsheetFeeButton);
+  page.querySelector("[data-save-spreadsheet-fee]")?.addEventListener("click", saveSpreadsheetFee);
+  page.querySelector("[data-spreadsheet-select-all]")?.addEventListener("click", () => {
+    page.querySelectorAll("[data-spreadsheet-sheet]:not(:disabled)").forEach((checkbox) => { checkbox.checked = true; });
+  });
+  page.querySelector("[data-spreadsheet-clear]")?.addEventListener("click", () => {
+    page.querySelectorAll("[data-spreadsheet-sheet]").forEach((checkbox) => { checkbox.checked = false; });
+  });
+  page.querySelector("[data-generate-spreadsheet]")?.addEventListener("click", generateSpreadsheet);
+}
+
+async function loadSpreadsheetModule() {
+  const page = getPage();
+  const seasonSelect = page?.querySelector("[data-spreadsheet-season]");
+  if (!page || !seasonSelect) return;
+  seasonSelect.disabled = true;
+  seasonSelect.innerHTML = '<option>Carregando...</option>';
+  try {
+    const data = await getAdminTemporadas(activeAdminSession.token);
+    if (!document.body.contains(seasonSelect)) return;
+    spreadsheetCurrentSeason = Number(data.temporada_atual);
+    spreadsheetSeasons = (data.temporadas || []).filter((season) =>
+      Number(season.participantes_a) > 0 || Number(season.participantes_b) > 0
+    );
+    seasonSelect.innerHTML = spreadsheetSeasons
+      .map((season) => `<option value="${season.temporada}" ${Number(season.temporada) === spreadsheetCurrentSeason ? "selected" : ""}>${season.temporada} · ${season.status === "ATIVA" ? "Atual" : season.status === "ARQUIVADA" ? "Histórica" : "Em preparação"}</option>`)
+      .join("");
+    seasonSelect.disabled = !spreadsheetSeasons.length;
+    seasonSelect.dataset.loaded = "true";
+    if (!spreadsheetSeasons.length) {
+      seasonSelect.innerHTML = '<option value="">Nenhuma temporada disponível</option>';
+    }
+    updateSpreadsheetConfiguration();
+  } catch (error) {
+    seasonSelect.innerHTML = '<option value="">Erro ao carregar</option>';
+    showAdminModal("Não foi possível carregar", error.message, "error");
+  }
+}
+
+function selectedSpreadsheetSeason() {
+  const year = Number(getPage()?.querySelector("[data-spreadsheet-season]")?.value);
+  return spreadsheetSeasons.find((season) => Number(season.temporada) === year) || null;
+}
+
+function updateSpreadsheetConfiguration() {
+  const page = getPage();
+  const season = selectedSpreadsheetSeason();
+  if (!page || !season) return;
+  const divisionSelect = page.querySelector("[data-spreadsheet-division]");
+  const versionSelect = page.querySelector("[data-spreadsheet-version]");
+  const feeInput = page.querySelector("[data-spreadsheet-fee]");
+  const note = page.querySelector("[data-spreadsheet-version-note]");
+  const counts = { A: Number(season.participantes_a) || 0, B: Number(season.participantes_b) || 0 };
+  [...divisionSelect.options].forEach((option) => {
+    option.disabled = counts[option.value] === 0;
+    option.textContent = `Série ${option.value}${counts[option.value] ? ` · ${counts[option.value]} jogadores` : " · não cadastrada"}`;
+  });
+  if (counts[divisionSelect.value] === 0) divisionSelect.value = counts.A ? "A" : "B";
+
+  const historical = season.status === "ARQUIVADA" || season.tipo === "LEGADA" || Number(season.temporada) < spreadsheetCurrentSeason;
+  const manualOption = versionSelect.querySelector('option[value="manual"]');
+  manualOption.disabled = historical;
+  if (historical && versionSelect.value === "manual") versionSelect.value = "updated";
+  note.innerHTML = historical
+    ? '<i class="bi bi-info-circle"></i> Temporadas históricas geram somente a versão atualizada e completa.'
+    : versionSelect.value === "manual"
+      ? '<i class="bi bi-pencil-square"></i> A versão manual deixa placares e quadros estatísticos em branco para preenchimento à mão.'
+      : '<i class="bi bi-database-check"></i> A versão atualizada utiliza o estado atual do banco de dados.';
+
+  const classification = page.querySelector('[data-spreadsheet-sheet][value="classificacao"]');
+  const classificationLabel = classification?.closest("label");
+  const manual = versionSelect.value === "manual";
+  if (classification) {
+    classification.disabled = manual;
+    classification.checked = !manual;
+  }
+  classificationLabel?.classList.toggle("is-disabled", manual);
+  feeInput.value = season.taxa_inscricao === null || season.taxa_inscricao === undefined ? "" : Number(season.taxa_inscricao).toFixed(2);
+  feeInput.dataset.savedValue = feeInput.value;
+  feeInput.disabled = !adminEditMode;
+  updateSpreadsheetFeeButton();
+}
+
+function updateSpreadsheetFeeButton() {
+  const page = getPage();
+  const input = page?.querySelector("[data-spreadsheet-fee]");
+  const button = page?.querySelector("[data-save-spreadsheet-fee]");
+  if (!input || !button) return;
+  button.disabled = !adminEditMode || input.value === input.dataset.savedValue;
+}
+
+async function saveSpreadsheetFee(event) {
+  const button = event.currentTarget;
+  const page = getPage();
+  const input = page?.querySelector("[data-spreadsheet-fee]");
+  const season = selectedSpreadsheetSeason();
+  if (!input || !season || !adminEditMode) return;
+  button.disabled = true;
+  button.innerHTML = '<span class="loading-spinner-inline"></span> Salvando';
+  try {
+    const response = await saveAdminTaxaInscricao(activeAdminSession.token, season.temporada, input.value);
+    season.taxa_inscricao = response.taxa_inscricao;
+    input.value = response.taxa_inscricao === null ? "" : Number(response.taxa_inscricao).toFixed(2);
+    input.dataset.savedValue = input.value;
+    showAdminModal("Taxa salva", `A taxa de inscrição de ${season.temporada} foi atualizada.`, "success");
+  } catch (error) {
+    showAdminModal("Não foi possível salvar", error.message, "error");
+  } finally {
+    button.innerHTML = "Salvar taxa";
+    updateSpreadsheetFeeButton();
+  }
+}
+
+async function generateSpreadsheet(event) {
+  const page = getPage();
+  const season = selectedSpreadsheetSeason();
+  const division = page?.querySelector("[data-spreadsheet-division]")?.value;
+  const version = page?.querySelector("[data-spreadsheet-version]")?.value;
+  const sheets = [...(page?.querySelectorAll("[data-spreadsheet-sheet]:checked:not(:disabled)") || [])].map((checkbox) => checkbox.value);
+  if (!season || !division || !sheets.length) {
+    showAdminModal("Selecione as folhas", "Escolha ao menos uma folha para gerar a planilha.", "error");
+    return;
+  }
+  const button = event.currentTarget;
+  button.disabled = true;
+  button.innerHTML = '<span class="loading-spinner-inline"></span> Gerando planilha';
+  try {
+    const data = await getAdminDadosPlanilha(activeAdminSession.token, season.temporada, division);
+    await exportChampionshipSpreadsheet(data, { version, sheets });
+    showAdminModal("Planilha gerada", `O arquivo da Série ${division} de ${season.temporada} foi preparado para download.`, "success");
+  } catch (error) {
+    showAdminModal("Não foi possível gerar", error.message, "error");
+  } finally {
+    button.disabled = false;
+    button.innerHTML = '<i class="bi bi-download"></i> Gerar planilha';
+  }
 }
 
 async function loadAdminSeasons() {
@@ -468,13 +673,14 @@ function renderSeasonList(data) {
   const container = page?.querySelector("[data-admin-seasons]");
   const yearSelect = page?.querySelector("[data-season-year]");
   const legacyYear = page?.querySelector("[data-season-legacy-year]");
+  const rankingReference = page?.querySelector("[data-ranking-reference]");
   if (!container || !yearSelect) return;
   const seasons = data.temporadas || [];
   container.innerHTML = seasons.map((season) => `
     <article class="admin-season-summary ${season.status === "ATIVA" ? "is-current" : ""}">
       <div><strong>Temporada ${season.temporada}</strong><span>${season.status === "ATIVA" ? "Atual e publicada" : season.status === "ARQUIVADA" ? "Temporada histórica" : season.tipo === "LEGADA" ? "Rascunho histórico" : "Preparação salva"}</span></div>
       <small>Série A: ${season.participantes_a} · Série B: ${season.participantes_b}</small>
-      ${season.status === "PREPARACAO" ? `<button class="btn btn-admin-secondary" type="button" data-edit-season="${season.temporada}">Editar</button>` : ""}
+      ${season.status === "PREPARACAO" || (season.status === "ARQUIVADA" && season.tipo === "LEGADA") ? `<button class="btn btn-admin-secondary" type="button" data-edit-season="${season.temporada}">Editar</button>` : ""}
     </article>`).join("");
   const used = new Set(seasons.map((season) => Number(season.temporada)));
   const start = Math.max(Number(data.ano_minimo), Number(data.temporada_atual) + 1);
@@ -494,7 +700,51 @@ function renderSeasonList(data) {
       .join("");
   }
   page.querySelector("[data-create-legacy-season]").disabled = !legacyYear?.value || Boolean(seasonDraft);
+  if (rankingReference) {
+    const rankingSeasons = seasons
+      .filter((season) => ["ATIVA", "ARQUIVADA"].includes(season.status) && Number(season.participantes_a) >= 2)
+      .sort((a, b) => Number(b.temporada) - Number(a.temporada));
+    rankingReference.innerHTML = [
+      `<option value="">Automático (${Number(data.temporada_atual) - 1})</option>`,
+      ...rankingSeasons.map((season) => `<option value="${season.temporada}">${season.temporada}${Number(season.temporada) === Number(data.temporada_atual) ? " · temporada atual" : ""}</option>`),
+    ].join("");
+    rankingReference.value = data.referencia_ranking == null ? "" : String(data.referencia_ranking);
+    rankingReference.dataset.savedValue = rankingReference.value;
+    rankingReference.disabled = !adminEditMode;
+    updateRankingReferenceButton();
+  }
   container.querySelectorAll("[data-edit-season]").forEach((button) => button.addEventListener("click", () => openSavedSeason(Number(button.dataset.editSeason))));
+}
+
+function updateRankingReferenceButton() {
+  const select = getPage()?.querySelector("[data-ranking-reference]");
+  const button = getPage()?.querySelector("[data-save-ranking-reference]");
+  if (!select || !button) return;
+  button.disabled = !adminEditMode || select.value === select.dataset.savedValue;
+}
+
+async function saveRankingReference(event) {
+  const select = getPage()?.querySelector("[data-ranking-reference]");
+  if (!select || !adminEditMode) return;
+  const button = event.currentTarget;
+  button.disabled = true;
+  button.innerHTML = '<span class="loading-spinner-inline"></span> Salvando';
+  try {
+    const result = await saveAdminRankingReference(activeAdminSession.token, select.value || null);
+    select.dataset.savedValue = result.referencia_ranking == null ? "" : String(result.referencia_ranking);
+    showAdminModal(
+      "Referência atualizada",
+      result.referencia_ranking == null
+        ? `O Ranking acompanhará automaticamente a temporada ${result.referencia_ranking_efetiva}.`
+        : `O Ranking agora considera as cinco temporadas até ${result.referencia_ranking_efetiva}.`,
+      "success",
+    );
+  } catch (error) {
+    showAdminModal("Não foi possível salvar", error.message, "error");
+  } finally {
+    button.innerHTML = "Salvar referência";
+    updateRankingReferenceButton();
+  }
 }
 
 function selectLegacySeasonSpreadsheet() {
@@ -507,6 +757,13 @@ function selectLegacySeasonSpreadsheet() {
     showAdminModal("Informe o ano", "Escolha o ano da temporada passada antes de selecionar a planilha.", "error");
     return;
   }
+  legacySpreadsheetTarget = "new";
+  getPage()?.querySelector("[data-season-legacy-file]")?.click();
+}
+
+function selectLegacySeasonSpreadsheetForEditor() {
+  if (!adminEditMode || seasonDraft?.modo !== "LEGADA") return;
+  legacySpreadsheetTarget = "editor";
   getPage()?.querySelector("[data-season-legacy-file]")?.click();
 }
 
@@ -514,39 +771,58 @@ async function importLegacySeasonSpreadsheet(event) {
   const file = event.currentTarget.files?.[0];
   event.currentTarget.value = "";
   if (!file) return;
-  const year = Number(getPage()?.querySelector("[data-season-legacy-year]")?.value);
-  const button = getPage()?.querySelector("[data-create-legacy-season]");
+  const editingExisting = legacySpreadsheetTarget === "editor" && seasonDraft?.modo === "LEGADA";
+  const year = editingExisting
+    ? Number(seasonDraft.temporada)
+    : Number(getPage()?.querySelector("[data-season-legacy-year]")?.value);
+  const button = editingExisting
+    ? getPage()?.querySelector("[data-import-season-spreadsheet]")
+    : getPage()?.querySelector("[data-create-legacy-season]");
   if (button) {
     button.disabled = true;
     button.innerHTML = '<span class="loading-spinner loading-spinner-inline" aria-hidden="true"></span> Importando...';
   }
   try {
-    const base = await prepareAdminTemporadaLegada(activeAdminSession.token, year);
-    const imported = await readLegacySeasonSpreadsheet(file, base.jogadores || []);
+    const base = editingExisting
+      ? structuredClone(seasonDraft)
+      : await prepareAdminTemporadaLegada(activeAdminSession.token, year);
+    const imported = await readLegacySeasonSpreadsheet(file, base.jogadores || [], editingExisting ? base : null);
     if (!imported) return;
-    setSeasonDraft({
+    const importedDraft = {
       ...base,
-      persistida: false,
+      persistida: editingExisting ? base.persistida : false,
       modo: "LEGADA",
       participantes: imported.participantes,
       rodadas: imported.rodadas,
-    });
+    };
+    if (editingExisting) {
+      seasonDraft = structuredClone(importedDraft);
+      renderSeasonEditor();
+      getPage()?.querySelector("[data-season-editor]")?.classList.add("is-dirty");
+    } else {
+      setSeasonDraft(importedDraft);
+    }
     showAdminModal(
       "Planilha importada",
-      `Os dados de ${year} foram carregados somente para revisão. Confira participantes, datas, horários e placares antes de salvar o rascunho.`,
+      editingExisting
+        ? `As séries presentes na planilha foram atualizadas em ${year}. As demais foram preservadas. Confira tudo antes de salvar as alterações.`
+        : `Os dados de ${year} foram carregados somente para revisão. Confira participantes, datas, horários e placares antes de salvar o rascunho.`,
       "success",
     );
   } catch (error) {
     showAdminModal("Não foi possível importar", error.message, "error");
   } finally {
     if (button) {
-      button.disabled = Boolean(seasonDraft);
-      button.innerHTML = '<i class="bi bi-file-earmark-arrow-up"></i> Importar planilha';
+      button.disabled = editingExisting ? !adminEditMode : Boolean(seasonDraft);
+      button.innerHTML = editingExisting
+        ? '<i class="bi bi-file-earmark-arrow-up"></i> Importar/atualizar planilha'
+        : '<i class="bi bi-file-earmark-arrow-up"></i> Importar planilha';
     }
+    legacySpreadsheetTarget = "new";
   }
 }
 
-async function readLegacySeasonSpreadsheet(file, players) {
+async function readLegacySeasonSpreadsheet(file, players, existingDraft = null) {
   const XLSX = await loadXlsxLibrary();
   const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
   const participantRows = getImportedSheetRows(XLSX, workbook, "Participantes");
@@ -555,9 +831,11 @@ async function readLegacySeasonSpreadsheet(file, players) {
   if (!matchRows.length) throw new Error("A aba Partidas está vazia.");
 
   const participantes = { A: [], B: [] };
+  const importedDivisions = new Set();
   const usedPlayers = new Set();
   participantRows.forEach((row, index) => {
     const division = String(row.divisao || "").trim().toUpperCase();
+    importedDivisions.add(division);
     const number = Number(row.numero);
     if (!participantes[division]) throw new Error(`Participantes, linha ${index + 2}: informe divisão A ou B.`);
     if (!Number.isInteger(number) || number < 1) throw new Error(`Participantes, linha ${index + 2}: número inválido.`);
@@ -583,9 +861,9 @@ async function readLegacySeasonSpreadsheet(file, players) {
       if (participant.numero !== index + 1) throw new Error(`Na Série ${division}, os participantes devem ser numerados em sequência a partir de 1.`);
     });
   });
-  if (participantes.A.length < 2) throw new Error("A aba Participantes deve conter pelo menos 2 jogadores na Série A.");
+  if (!existingDraft && participantes.A.length < 2) throw new Error("A aba Participantes deve conter pelo menos 2 jogadores na Série A.");
   if (participantes.B.length === 1) throw new Error("Quando informada, a Série B deve conter pelo menos 2 jogadores.");
-  if (!participantes.B.length) {
+  if (!existingDraft && !participantes.B.length) {
     const confirmed = await confirmAdminChange(
       "Temporada sem Série B?",
       "A planilha não possui participantes da Série B. Confirma que esta temporada teve somente a Série A?",
@@ -601,6 +879,9 @@ async function readLegacySeasonSpreadsheet(file, players) {
     const number1 = Number(row.numero1);
     const number2 = Number(row.numero2);
     if (!roundMaps[division]) throw new Error(`Partidas, linha ${line}: informe divisão A ou B.`);
+    if (!importedDivisions.has(division)) {
+      throw new Error(`Partidas, linha ${line}: inclua também os participantes da Série ${division} nesta importação.`);
+    }
     if (!Number.isInteger(roundNumber) || roundNumber < 1) throw new Error(`Partidas, linha ${line}: rodada inválida.`);
     const participantNumbers = new Set(participantes[division].map((item) => item.numero));
     if (!participantNumbers.has(number1) || !participantNumbers.has(number2) || number1 === number2) {
@@ -654,7 +935,19 @@ async function readLegacySeasonSpreadsheet(file, players) {
       }
     });
   });
-  return { participantes, rodadas };
+  if (!existingDraft) return { participantes, rodadas };
+  const mergedParticipants = structuredClone(existingDraft.participantes);
+  const mergedRounds = structuredClone(existingDraft.rodadas);
+  importedDivisions.forEach((division) => {
+    mergedParticipants[division] = participantes[division];
+    mergedRounds[division] = rodadas[division];
+  });
+  const mergedIds = [...mergedParticipants.A, ...mergedParticipants.B]
+    .map((item) => Number(item.jogador_id));
+  if (new Set(mergedIds).size !== mergedIds.length) {
+    throw new Error("Um jogador não pode participar das duas séries na mesma temporada.");
+  }
+  return { participantes: mergedParticipants, rodadas: mergedRounds };
 }
 
 function getImportedSheetRows(XLSX, workbook, expectedName) {
@@ -846,16 +1139,21 @@ function renderSeasonEditor() {
       ${seasonDraft.modo === "LEGADA" ? `<label class="admin-season-tiebreak" title="Prioridade interna aplicada somente em empates"><span>Desempate</span><input class="admin-input" type="number" min="1" step="1" inputmode="numeric" value="${participant.desempate || ""}" data-season-tiebreak ${adminEditMode ? "" : "disabled"}></label>` : ""}
       ${division === "B" ? '<button class="btn btn-admin-secondary" type="button" data-remove-season-player aria-label="Remover participante"><i class="bi bi-trash"></i></button>' : ""}
     </div>`).join("");
+  const publishedLegacy = seasonDraft.modo === "LEGADA" && seasonDraft.status === "ARQUIVADA";
+  const persistedControls = seasonDraft.persistida && !publishedLegacy
+    ? `<div class="admin-season-editor-controls"><button class="btn" type="button" data-activate-season>${seasonDraft.modo === "LEGADA" ? "Publicar" : "Ativar temporada"}</button><button class="btn btn-admin-danger" type="button" data-delete-season>Excluir temporada</button></div>`
+    : "";
   editor.hidden = false;
   editor.innerHTML = `
-    <div class="admin-season-editor-heading"><div><strong>Temporada ${seasonDraft.temporada}</strong><span>${seasonDraft.modo === "LEGADA" ? seasonDraft.persistida ? "Rascunho histórico salvo" : "Cadastro de temporada passada" : seasonDraft.persistida ? "Preparação salva" : "Novo rascunho não salvo"}</span></div>${seasonDraft.persistida ? `<div class="admin-season-editor-controls"><button class="btn" type="button" data-activate-season>${seasonDraft.modo === "LEGADA" ? "Publicar" : "Ativar temporada"}</button><button class="btn btn-admin-danger" type="button" data-delete-season>Excluir temporada</button></div>` : ""}</div>
+    <div class="admin-season-editor-heading"><div><strong>Temporada ${seasonDraft.temporada}</strong><span>${publishedLegacy ? "Temporada histórica publicada" : seasonDraft.modo === "LEGADA" ? seasonDraft.persistida ? "Rascunho histórico salvo" : "Cadastro de temporada passada" : seasonDraft.persistida ? "Preparação salva" : "Novo rascunho não salvo"}</span></div>${persistedControls}</div>
+    ${seasonDraft.modo === "LEGADA" ? `<div class="admin-season-editor-controls"><button class="btn btn-admin-secondary" type="button" data-import-season-spreadsheet ${adminEditMode ? "" : "disabled"}><i class="bi bi-file-earmark-arrow-up"></i> Importar/atualizar planilha</button></div>` : ""}
     ${seasonDraft.modo === "LEGADA" ? '<p class="admin-season-tiebreak-note"><strong>Desempate interno:</strong> use 1, 2, 3… somente para definir a ordem manual entre jogadores com os mesmos números de vitórias e partidas ganhas. Essa prioridade não aparece no site público.</p>' : ""}
     <div class="admin-season-divisions">
       <section><h3>Série A <small>${seasonDraft.participantes.A.length} participantes</small></h3><div data-season-list="A">${rows("A")}</div></section>
       <section><h3>Série B <small>${seasonDraft.participantes.B.length} participantes${seasonDraft.modo === "LEGADA" ? " (opcional)" : ""}</small></h3><div data-season-list="B">${rows("B")}</div><button class="btn btn-admin-secondary admin-season-add" type="button" data-add-season-player ${adminEditMode ? "" : "disabled"}><i class="bi bi-person-plus"></i> Adicionar participante</button></section>
     </div>
     ${renderSeasonSchedulePreview()}
-    <div class="admin-season-actions"><button class="btn btn-admin-secondary" type="button" data-cancel-season>Cancelar alterações</button><button class="btn" type="button" data-save-season ${adminEditMode ? "" : "disabled"}>${seasonDraft.modo === "LEGADA" ? "Salvar rascunho" : "Salvar temporada"}</button></div>`;
+    <div class="admin-season-actions"><button class="btn btn-admin-secondary" type="button" data-cancel-season>Cancelar alterações</button><button class="btn" type="button" data-save-season ${adminEditMode ? "" : "disabled"}>${publishedLegacy ? "Salvar alterações" : seasonDraft.modo === "LEGADA" ? "Salvar rascunho" : "Salvar temporada"}</button></div>`;
   editor.querySelectorAll("[data-season-participant] select").forEach((select) => select.addEventListener("change", syncSeasonDraftFromEditor));
   editor.querySelectorAll("[data-season-tiebreak]").forEach((input) => input.addEventListener("change", syncSeasonDraftFromEditor));
   editor.querySelectorAll("[data-season-participant] select").forEach(enhanceSearchablePlayerSelect);
@@ -865,6 +1163,7 @@ function renderSeasonEditor() {
   editor.querySelector("[data-save-season]")?.addEventListener("click", saveSeasonChanges);
   editor.querySelector("[data-delete-season]")?.addEventListener("click", deleteSeasonDraft);
   editor.querySelector("[data-activate-season]")?.addEventListener("click", activateSeasonDraft);
+  editor.querySelector("[data-import-season-spreadsheet]")?.addEventListener("click", selectLegacySeasonSpreadsheetForEditor);
   editor.querySelectorAll("[data-draw-season]").forEach((button) =>
     button.addEventListener("click", () => previewSeasonDraw(button.dataset.drawSeason)),
   );
@@ -1372,9 +1671,12 @@ async function saveSeasonChanges() {
   const ids = [...seasonDraft.participantes.A, ...seasonDraft.participantes.B].map((item) => item.jogador_id);
   if (new Set(ids).size !== ids.length) return showAdminModal("Jogador duplicado", "Cada jogador pode ocupar somente uma vaga na temporada.", "error");
   const legacy = seasonDraft.modo === "LEGADA";
+  const publishedLegacy = legacy && seasonDraft.status === "ARQUIVADA";
   const confirmed = await confirmAdminChange(
-    legacy ? "Salvar rascunho histórico?" : "Salvar preparação?",
-    legacy
+    publishedLegacy ? "Salvar alterações no Histórico?" : legacy ? "Salvar rascunho histórico?" : "Salvar preparação?",
+    publishedLegacy
+      ? `A temporada ${seasonDraft.temporada} continuará publicada e o Histórico será atualizado com estes dados.`
+      : legacy
       ? `O cadastro de ${seasonDraft.temporada} será salvo como rascunho e ainda não aparecerá no Histórico.`
       : `A temporada ${seasonDraft.temporada} será salva sem alterar a temporada atual.`,
   );
@@ -1391,8 +1693,10 @@ async function saveSeasonChanges() {
     setSeasonDraft(data);
     await loadAdminSeasons();
     showAdminModal(
-      legacy ? "Rascunho histórico salvo" : "Temporada salva",
-      legacy
+      publishedLegacy ? "Temporada histórica atualizada" : legacy ? "Rascunho histórico salvo" : "Temporada salva",
+      publishedLegacy
+        ? `As alterações de ${savedYear} foram salvas e já estão disponíveis no Histórico.`
+        : legacy
         ? `O cadastro de ${savedYear} foi salvo e ainda não está publicado no Histórico.`
         : "A preparação foi salva e poderá ser retomada em outra sessão.",
       "success",

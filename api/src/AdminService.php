@@ -118,6 +118,14 @@ final class AdminService
             GROUP BY s.id, s.year, s.version, s.status, s.origin, s.created_at, s.updated_at
             ORDER BY s.year DESC, s.version DESC
         SQL);
+        $fees = [];
+        $feeStatement = $this->db->query(
+            "SELECT setting_key, setting_value FROM settings WHERE setting_key LIKE 'taxa_inscricao_%'"
+        );
+        foreach ($feeStatement->fetchAll() as $fee) {
+            $fees[(int) substr((string) $fee['setting_key'], strlen('taxa_inscricao_'))] =
+                $fee['setting_value'] === '' ? null : (float) $fee['setting_value'];
+        }
         $seasons = array_map(fn ($row) => [
             'temporada' => (int) $row['year'],
             'versao' => (int) $row['version'],
@@ -127,12 +135,188 @@ final class AdminService
             'atualizado_em' => $row['updated_at'],
             'participantes_a' => (int) $row['participants_a'],
             'participantes_b' => (int) $row['participants_b'],
+            'taxa_inscricao' => $fees[(int) $row['year']] ?? null,
         ], $statement->fetchAll());
+
+        $rankingReference = $this->db->query(
+            "SELECT setting_value FROM settings WHERE setting_key = 'ranking_reference_year'"
+        )->fetchColumn();
 
         return [
             'temporada_atual' => $currentYear,
             'ano_minimo' => (int) gmdate('Y'),
+            'referencia_ranking' => $rankingReference !== false && ctype_digit((string) $rankingReference)
+                ? (int) $rankingReference : null,
+            'referencia_ranking_efetiva' => $rankingReference !== false && ctype_digit((string) $rankingReference)
+                ? (int) $rankingReference : $currentYear - 1,
             'temporadas' => $seasons,
+        ];
+    }
+
+    public function saveRankingReference(string $token, mixed $informedYear): array
+    {
+        $administrator = $this->auth->administrator($token);
+        $text = trim((string) ($informedYear ?? ''));
+        $year = $text === '' ? null : filter_var($text, FILTER_VALIDATE_INT);
+        if ($text !== '' && !$year) {
+            throw new ApiException('Selecione uma temporada de referência válida.');
+        }
+        if ($year !== null) {
+            $statement = $this->db->prepare(<<<'SQL'
+                SELECT COUNT(p.id)
+                FROM seasons s
+                JOIN participants p ON p.season_id = s.id AND p.division = 'A'
+                WHERE s.year = :year AND s.status IN ('ATIVA', 'ARQUIVADA')
+            SQL);
+            $statement->execute(['year' => $year]);
+            if ((int) $statement->fetchColumn() < 2) {
+                throw new ApiException('A referência precisa possuir uma Série A publicada.');
+            }
+        }
+        $before = $this->db->query(
+            "SELECT setting_value FROM settings WHERE setting_key = 'ranking_reference_year'"
+        )->fetchColumn();
+        $statement = $this->db->prepare(<<<'SQL'
+            INSERT INTO settings (setting_key, setting_value)
+            VALUES ('ranking_reference_year', :value)
+            ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
+        SQL);
+        $statement->execute(['value' => $year === null ? '' : (string) $year]);
+        $this->bumpDataVersion();
+        $this->audit(
+            (int) $administrator['administrator_id'],
+            'salvar_referencia_ranking',
+            'configuracao',
+            'ranking_reference_year',
+            ['temporada' => $before === false || $before === '' ? null : (int) $before],
+            ['temporada' => $year],
+        );
+        return [
+            'sucesso' => true,
+            'referencia_ranking' => $year,
+            'referencia_ranking_efetiva' => $year ?? ($this->public->currentSeason() - 1),
+        ];
+    }
+
+    public function saveRegistrationFee(string $token, mixed $informedYear, mixed $informedFee): array
+    {
+        $administrator = $this->auth->administrator($token);
+        $year = filter_var($informedYear, FILTER_VALIDATE_INT);
+        if (!$year) {
+            throw new ApiException('Temporada inválida.');
+        }
+        $exists = $this->db->prepare('SELECT 1 FROM seasons WHERE year = :year');
+        $exists->execute(['year' => $year]);
+        if (!$exists->fetchColumn()) {
+            throw new ApiException('Temporada não encontrada.', 404);
+        }
+        $text = str_replace(',', '.', trim((string) ($informedFee ?? '')));
+        if ($text !== '' && (!is_numeric($text) || (float) $text < 0)) {
+            throw new ApiException('Informe uma taxa de inscrição válida.');
+        }
+        $value = $text === '' ? '' : number_format((float) $text, 2, '.', '');
+        $statement = $this->db->prepare(<<<'SQL'
+            INSERT INTO settings (setting_key, setting_value)
+            VALUES (:setting_key, :setting_value)
+            ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
+        SQL);
+        $statement->execute([
+            'setting_key' => 'taxa_inscricao_' . $year,
+            'setting_value' => $value,
+        ]);
+        $this->audit(
+            (int) $administrator['administrator_id'],
+            'salvar_taxa_inscricao',
+            'temporada',
+            (string) $year,
+            null,
+            ['temporada' => $year, 'taxa_inscricao' => $value === '' ? null : (float) $value],
+        );
+        return ['sucesso' => true, 'temporada' => $year, 'taxa_inscricao' => $value === '' ? null : (float) $value];
+    }
+
+    public function spreadsheetData(string $token, mixed $informedYear, string $informedDivision): array
+    {
+        $this->auth->administrator($token);
+        $year = filter_var($informedYear, FILTER_VALIDATE_INT);
+        $division = strtoupper(trim($informedDivision));
+        if (!$year || !in_array($division, ['A', 'B'], true)) {
+            throw new ApiException('Temporada ou divisão inválida.');
+        }
+        $seasonStatement = $this->db->prepare(
+            'SELECT id, year, status, origin FROM seasons WHERE year = :year LIMIT 1'
+        );
+        $seasonStatement->execute(['year' => $year]);
+        $season = $seasonStatement->fetch();
+        if (!$season) {
+            throw new ApiException('Temporada não encontrada.', 404);
+        }
+        $participantStatement = $this->db->prepare(<<<'SQL'
+            SELECT p.id AS participant_id, p.number, p.tiebreak_priority,
+                   j.id AS player_id, j.name, j.display_name, j.nickname
+            FROM participants p
+            JOIN players j ON j.id = p.player_id
+            WHERE p.season_id = :season_id AND p.division = :division
+            ORDER BY p.number
+        SQL);
+        $participantStatement->execute(['season_id' => $season['id'], 'division' => $division]);
+        $participants = $participantStatement->fetchAll();
+        if (count($participants) < 2) {
+            throw new ApiException("Não há Série {$division} registrada nesta temporada.", 404);
+        }
+        $matchStatement = $this->db->prepare(<<<'SQL'
+            SELECT r.number AS round_number, m.participant1_id, m.participant2_id,
+                   m.score1, m.score2
+            FROM matches m
+            JOIN rounds r ON r.id = m.round_id
+            WHERE r.season_id = :season_id AND r.division = :division AND m.status = 'E'
+            ORDER BY r.number, m.match_order
+        SQL);
+        $matchStatement->execute(['season_id' => $season['id'], 'division' => $division]);
+        $finishedMatches = $matchStatement->fetchAll();
+        $rounds = $this->draftSchedule((int) $season['id'])[$division];
+        $statistics = StatisticsCalculator::calculate(
+            (int) $year,
+            $division,
+            $participants,
+            $finishedMatches,
+            count($rounds),
+        );
+        $playersByNumber = [];
+        foreach ($participants as $participant) {
+            $playersByNumber[(int) $participant['number']] = [
+                'numero' => (int) $participant['number'],
+                'jogador_id' => (int) $participant['player_id'],
+                'nome' => $participant['name'],
+                'exibicao' => $participant['display_name'],
+                'apelido' => $participant['nickname'],
+            ];
+        }
+        foreach ($rounds as &$round) {
+            if ($round['folga'] !== null) {
+                $round['jogador_folga'] = $playersByNumber[(int) $round['folga']] ?? null;
+            }
+            foreach ($round['partidas'] as &$match) {
+                $match['jogador1'] = $playersByNumber[(int) $match['numero1']];
+                $match['jogador2'] = $playersByNumber[(int) $match['numero2']];
+            }
+            unset($match);
+        }
+        unset($round);
+        $feeStatement = $this->db->prepare(
+            'SELECT setting_value FROM settings WHERE setting_key = :setting_key'
+        );
+        $feeStatement->execute(['setting_key' => 'taxa_inscricao_' . $year]);
+        $fee = $feeStatement->fetchColumn();
+        return [
+            'temporada' => (int) $year,
+            'divisao' => $division,
+            'status' => $season['status'],
+            'tipo' => $season['origin'],
+            'taxa_inscricao' => $fee === false || $fee === '' ? null : (float) $fee,
+            'participantes' => array_values($playersByNumber),
+            'rodadas' => $rounds,
+            'estatisticas' => $statistics,
         ];
     }
 
@@ -241,7 +425,11 @@ final class AdminService
         $seasonStatement = $this->db->prepare(<<<'SQL'
             SELECT id, year, version, status, origin
             FROM seasons
-            WHERE year = :year AND status = 'PREPARACAO'
+            WHERE year = :year
+              AND (
+                status = 'PREPARACAO'
+                OR (status = 'ARQUIVADA' AND origin = 'LEGADA')
+              )
             LIMIT 1
         SQL);
         $seasonStatement->execute(['year' => $year]);
@@ -276,7 +464,7 @@ final class AdminService
             'modo' => strtoupper((string) $season['origin']) === 'LEGADA' ? 'LEGADA' : 'NOVA',
             'temporada' => (int) $season['year'],
             'versao' => (int) $season['version'],
-            'status' => 'PREPARACAO',
+            'status' => strtoupper((string) $season['status']),
             'participantes' => $participants,
             'rodadas' => $this->draftSchedule((int) $season['id']),
             'jogadores' => $this->sortedPlayers(),
@@ -375,10 +563,12 @@ final class AdminService
             );
             $seasonStatement->execute(['year' => $year]);
             $current = $seasonStatement->fetch();
-            if ($current && ($current['status'] !== 'PREPARACAO' ||
+            $editableStatuses = ['PREPARACAO', 'ARQUIVADA'];
+            if ($current && (!in_array(strtoupper((string) $current['status']), $editableStatuses, true) ||
                 strtoupper((string) $current['origin']) !== 'LEGADA')) {
                 throw new ApiException("A temporada {$year} já está cadastrada.");
             }
+            $savedStatus = $current ? strtoupper((string) $current['status']) : 'PREPARACAO';
             if ($current) {
                 $seasonId = (int) $current['id'];
                 $this->clearSeasonContent($seasonId);
@@ -403,7 +593,7 @@ final class AdminService
                 $current ? ['temporada' => $year, 'status' => $current['status']] : null,
                 [
                     'temporada' => $year,
-                    'status' => 'PREPARACAO',
+                    'status' => $savedStatus,
                     'tipo' => 'LEGADA',
                     'participantes_a' => count($participants['A']),
                     'participantes_b' => count($participants['B']),

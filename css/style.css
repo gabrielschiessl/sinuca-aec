@@ -14,6 +14,12 @@ html{
 
 }
 
+html.is-resetting-page-scroll,
+html.is-resetting-page-scroll body,
+html.is-resetting-page-scroll #app {
+    overflow-anchor:none;
+}
+
 body{
 
     background:var(--background);

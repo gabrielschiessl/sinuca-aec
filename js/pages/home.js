@@ -45,6 +45,12 @@ ${renderNavbar()}
       text: "Histórico",
     })}
 
+    ${menuButton({
+      route: "/ranking",
+      icon: "bi bi-list-ol",
+      text: "Ranking",
+    })}
+
 </div>
   </section>
 

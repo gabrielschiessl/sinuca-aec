@@ -113,6 +113,10 @@ export async function getTemporadas() {
   return requestCached("temporadas", () => request("temporadas"));
 }
 
+export async function getRanking() {
+  return requestCached("ranking", () => request("ranking"));
+}
+
 /************************************************
  * Administração
  ************************************************/
@@ -143,6 +147,24 @@ export function getAdminJogadores(token) {
 
 export function getAdminTemporadas(token) {
   return post({ acao: "admin_temporadas", token });
+}
+
+export function getAdminDadosPlanilha(token, temporada, divisao) {
+  return post({ acao: "admin_dados_planilha", token, temporada, divisao });
+}
+
+export function saveAdminTaxaInscricao(token, temporada, taxa) {
+  return post({ acao: "salvar_taxa_inscricao", token, temporada, taxa }).then((result) => {
+    cache.clear();
+    return result;
+  });
+}
+
+export function saveAdminRankingReference(token, temporada) {
+  return post({ acao: "salvar_referencia_ranking", token, temporada }).then((result) => {
+    cache.clear();
+    return result;
+  });
 }
 
 export function prepareAdminTemporada(token, temporada) {

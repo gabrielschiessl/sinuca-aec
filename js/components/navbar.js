@@ -4,6 +4,7 @@ export function renderNavbar({ title = "" } = {}) {
   const isAdminPage = title === "Administrador";
   const isRulesPage = title === "Regra" || title === "Regulamento";
   const isHistoryPage = title === "Histórico";
+  const isRankingPage = title === "Ranking";
   const alternateDivision =
     title === "Série A"
       ? { title: "Série B", route: "/serie-b" }
@@ -68,7 +69,7 @@ export function renderNavbar({ title = "" } = {}) {
         </div>`
             : `
         ${
-          isAdminPage || isRulesPage || isHistoryPage
+          isAdminPage || isRulesPage || isHistoryPage || isRankingPage
             ? `<img
                 src="${BASE_PATH}/assets/images/esporte_branco.svg"
                 class="admin-title-logo"

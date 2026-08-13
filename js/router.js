@@ -4,6 +4,7 @@ import { renderSerieB } from "./pages/serieB.js";
 import { renderAdministrador } from "./pages/administrador.js";
 import { renderRegra } from "./pages/regra.js";
 import { renderHistorico } from "./pages/historico.js";
+import { renderRanking } from "./pages/ranking.js";
 import { withBasePath, withoutBasePath } from "./config.js";
 import { resetPageScroll } from "./utils/pageScroll.js";
 
@@ -16,6 +17,7 @@ const routes = {
   "/administrador": renderAdministrador,
   "/regra": renderRegra,
   "/historico": renderHistorico,
+  "/ranking": renderRanking,
 };
 
 export function router() {
@@ -27,10 +29,27 @@ export function router() {
 }
 
 export function navigate(path) {
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
+
+  // Evita que a nova entrada do histórico herde a posição da página atual.
+  resetPageScroll();
+
+  const destination = `${withBasePath(path)}${window.location.search}`;
+
+  // No mobile, trocar apenas o conteúdo da Home mantém o mesmo viewport e
+  // alguns navegadores carregam a posição rolada no conteúdo seguinte.
+  // Uma navegação real ao sair da Home cria um documento novo já no topo.
+  if (withoutBasePath() === "/" && path !== "/") {
+    window.location.assign(destination);
+    return;
+  }
+
   window.history.pushState(
     {},
     "",
-    `${withBasePath(path)}${window.location.search}`,
+    destination,
   );
 
   router();
@@ -39,6 +58,7 @@ export function navigate(path) {
 
 // permite voltar/avançar do navegador
 window.addEventListener("popstate", () => {
+  resetPageScroll();
   router();
   resetPageScroll();
 });
@@ -47,6 +67,8 @@ document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-route]");
 
   if (button) {
+    event.preventDefault();
+    button.blur();
     const route = button.dataset.route;
 
     navigate(route);

@@ -55,6 +55,7 @@ try {
         'temporadas' => $service->seasons(),
         'rodadas' => $service->rounds((string) ($_GET['serie'] ?? 'A'), $_GET['temporada'] ?? null),
         'estatisticas' => $service->statistics((string) ($_GET['serie'] ?? 'A'), $_GET['temporada'] ?? null),
+        'ranking' => $service->ranking(),
         'login_google' => $auth->loginGoogle((string) ($requestBody['credential'] ?? '')),
         'validar_sessao' => $auth->validate((string) ($requestBody['token'] ?? '')),
         'logout' => $auth->logout((string) ($requestBody['token'] ?? '')),
@@ -68,6 +69,20 @@ try {
         ),
         'admin_jogadores' => $admin->players((string) ($requestBody['token'] ?? '')),
         'admin_temporadas' => $admin->seasons((string) ($requestBody['token'] ?? '')),
+        'admin_dados_planilha' => $admin->spreadsheetData(
+            (string) ($requestBody['token'] ?? ''),
+            $requestBody['temporada'] ?? null,
+            (string) ($requestBody['divisao'] ?? 'A'),
+        ),
+        'salvar_taxa_inscricao' => $admin->saveRegistrationFee(
+            (string) ($requestBody['token'] ?? ''),
+            $requestBody['temporada'] ?? null,
+            $requestBody['taxa'] ?? null,
+        ),
+        'salvar_referencia_ranking' => $admin->saveRankingReference(
+            (string) ($requestBody['token'] ?? ''),
+            $requestBody['temporada'] ?? null,
+        ),
         'preparar_temporada' => $admin->prepareSeason(
             (string) ($requestBody['token'] ?? ''),
             $requestBody['temporada'] ?? null,
