@@ -1,0 +1,19 @@
+# O aplicativo e uma SPA atualizada com frequencia. O navegador deve sempre
+# revalidar HTML, JavaScript e CSS, evitando versoes antigas apos uma publicacao.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(?:html?|css|js|mjs)$">
+    Header always set Cache-Control "no-cache, must-revalidate, max-age=0"
+    Header always set Pragma "no-cache"
+    Header always set Expires "0"
+  </FilesMatch>
+</IfModule>
+
+# Mantem os recursos pesados e versionados pelo proprio nome em cache.
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/png "access plus 30 days"
+  ExpiresByType image/jpeg "access plus 30 days"
+  ExpiresByType image/svg+xml "access plus 30 days"
+  ExpiresByType image/x-icon "access plus 30 days"
+  ExpiresByType font/woff2 "access plus 30 days"
+</IfModule>
