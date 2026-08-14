@@ -61,7 +61,7 @@ main {
 
   max-width: 90%;
 
-  margin-top: var(--hero-top-spacing);
+  /* margin-top: var(--hero-top-spacing); */
 
   margin-bottom: 16px;
 }
@@ -75,7 +75,7 @@ main {
 
   font-weight: 500;
 
-  margin-bottom: 84px;
+  /* margin-bottom: 84px; */
 }
 
 footer {

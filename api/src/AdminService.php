@@ -37,7 +37,7 @@ final class AdminService
         $seasonId = $this->seasonId($year);
 
         $statement = $this->db->prepare(<<<'SQL'
-            SELECT p.number, p.player_id, p.tiebreak_priority,
+            SELECT p.number, p.player_id, p.tiebreak_priority, p.direct_wo,
                    j.name, j.display_name, j.nickname, j.active
             FROM participants p
             JOIN players j ON j.id = p.player_id
@@ -53,6 +53,7 @@ final class AdminService
                 'jogador_id' => (int) $row['player_id'],
                 'desempate' => $row['tiebreak_priority'] === null
                     ? null : (int) $row['tiebreak_priority'],
+                'wo_direto' => (bool) $row['direct_wo'],
                 'jogador' => $this->player($row),
             ],
             $statement->fetchAll(),
@@ -252,7 +253,7 @@ final class AdminService
             throw new ApiException('Temporada não encontrada.', 404);
         }
         $participantStatement = $this->db->prepare(<<<'SQL'
-            SELECT p.id AS participant_id, p.number, p.tiebreak_priority,
+            SELECT p.id AS participant_id, p.number, p.tiebreak_priority, p.direct_wo,
                    j.id AS player_id, j.name, j.display_name, j.nickname
             FROM participants p
             JOIN players j ON j.id = p.player_id
@@ -366,7 +367,7 @@ final class AdminService
         $year = $this->legacySeasonYear($informedYear, true);
         $currentYear = $this->public->currentSeason();
         $statement = $this->db->prepare(<<<'SQL'
-            SELECT p.division, p.number, p.player_id, p.tiebreak_priority
+            SELECT p.division, p.number, p.player_id, p.tiebreak_priority, p.direct_wo
             FROM participants p
             JOIN seasons s ON s.id = p.season_id
             WHERE s.year = :year
@@ -384,6 +385,7 @@ final class AdminService
                 'jogador_id' => (int) $participant['player_id'],
                 'desempate' => $participant['tiebreak_priority'] === null
                     ? null : (int) $participant['tiebreak_priority'],
+                'wo_direto' => false,
             ];
         }
         $rounds = [
@@ -439,7 +441,7 @@ final class AdminService
         }
 
         $participantsStatement = $this->db->prepare(<<<'SQL'
-            SELECT division, number, player_id, tiebreak_priority
+            SELECT division, number, player_id, tiebreak_priority, direct_wo
             FROM participants
             WHERE season_id = :season_id
             ORDER BY division, number
@@ -456,6 +458,7 @@ final class AdminService
                 'jogador_id' => (int) $participant['player_id'],
                 'desempate' => $participant['tiebreak_priority'] === null
                     ? null : (int) $participant['tiebreak_priority'],
+                'wo_direto' => (bool) $participant['direct_wo'],
             ];
         }
 
@@ -481,6 +484,7 @@ final class AdminService
         $year = $this->newSeasonYear($informedYear);
         $participants = $this->validateNewSeasonParticipants($informedParticipants);
         $rounds = $this->validateSeasonSchedule($informedRounds, $participants, true);
+        $rounds = $this->applyDirectWoToSchedule($rounds, $participants);
 
         $this->db->beginTransaction();
         try {
@@ -555,6 +559,7 @@ final class AdminService
         $participants = $this->validateLegacyParticipants($informedParticipants);
         $rounds = $this->validateSeasonSchedule($informedRounds, $participants, false);
         $rounds = $this->applyLegacyResults($rounds, $informedRounds);
+        $rounds = $this->applyDirectWoToSchedule($rounds, $participants);
 
         $this->db->beginTransaction();
         try {
@@ -757,7 +762,7 @@ final class AdminService
             $year = $this->public->currentSeason();
             $seasonId = $this->seasonId($year);
             $participantsStatement = $this->db->prepare(<<<'SQL'
-                SELECT id, division, number, player_id, tiebreak_priority
+                SELECT id, division, number, player_id, tiebreak_priority, direct_wo
                 FROM participants
                 WHERE season_id = :season_id
                 ORDER BY division, number
@@ -804,6 +809,7 @@ final class AdminService
                     'numero' => (int) $number,
                     'jogador_id' => (int) $playerId,
                     'desempate' => $tiebreak,
+                    'wo_direto' => $this->booleanValue($change['wo_direto'] ?? false),
                 ];
                 $changedNumbers[(int) $number] = true;
             }
@@ -814,6 +820,7 @@ final class AdminService
                 $beforeByIndex[$index] = $currentParticipants[$index];
                 $currentParticipants[$index]['player_id'] = $change['jogador_id'];
                 $currentParticipants[$index]['tiebreak_priority'] = $change['desempate'];
+                $currentParticipants[$index]['direct_wo'] = $change['wo_direto'];
             }
             $finalPlayerIds = array_map(
                 fn ($participant) => (int) $participant['player_id'],
@@ -825,7 +832,8 @@ final class AdminService
 
             $updateParticipant = $this->db->prepare(<<<'SQL'
                 UPDATE participants
-                SET player_id = :player_id, tiebreak_priority = :tiebreak_priority
+                SET player_id = :player_id, tiebreak_priority = :tiebreak_priority,
+                    direct_wo = :direct_wo
                 WHERE id = :id
             SQL);
             $affectedPlayerIds = [];
@@ -836,6 +844,7 @@ final class AdminService
                 $updateParticipant->execute([
                     'player_id' => $after['player_id'],
                     'tiebreak_priority' => $after['tiebreak_priority'],
+                    'direct_wo' => !empty($after['direct_wo']) ? 1 : 0,
                     'id' => $after['id'],
                 ]);
                 $affectedPlayerIds[(int) $before['player_id']] = true;
@@ -860,6 +869,8 @@ final class AdminService
                     'id' => $playerId,
                 ]);
             }
+
+            $this->applyStoredDirectWo($seasonId, $division);
 
             $this->bumpDataVersion();
             $this->db->commit();
@@ -1311,6 +1322,14 @@ final class AdminService
         return $priority;
     }
 
+    private function booleanValue(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+        return in_array(strtoupper(trim((string) $value)), ['1', 'S', 'SIM', 'TRUE', 'WO', 'W.O.'], true);
+    }
+
     private function participantAuditState(array $participant): array
     {
         return [
@@ -1319,6 +1338,7 @@ final class AdminService
             'jogador_id' => (int) $participant['player_id'],
             'desempate' => $participant['tiebreak_priority'] === null
                 ? null : (int) $participant['tiebreak_priority'],
+            'wo_direto' => (bool) ($participant['direct_wo'] ?? false),
         ];
     }
 
@@ -1419,6 +1439,7 @@ final class AdminService
                     'numero' => $index + 1,
                     'jogador_id' => (int) $playerId,
                     'desempate' => $this->tiebreakPriority($participant['desempate'] ?? null),
+                    'wo_direto' => $this->booleanValue($participant['wo_direto'] ?? false),
                 ];
                 $allIds[] = (int) $playerId;
             }
@@ -1461,6 +1482,7 @@ final class AdminService
                     'numero' => $index + 1,
                     'jogador_id' => (int) $playerId,
                     'desempate' => $this->tiebreakPriority($participant['desempate'] ?? null),
+                    'wo_direto' => $this->booleanValue($participant['wo_direto'] ?? false),
                 ];
                 $allIds[] = (int) $playerId;
             }
@@ -1653,6 +1675,117 @@ final class AdminService
         }
     }
 
+    private function applyDirectWoToSchedule(array $rounds, array $participants): array
+    {
+        $playerIds = [];
+        foreach (['A', 'B'] as $division) {
+            foreach ($participants[$division] as $participant) {
+                $playerIds[] = (int) $participant['jogador_id'];
+            }
+        }
+        $names = [];
+        if ($playerIds !== []) {
+            $placeholders = implode(',', array_fill(0, count($playerIds), '?'));
+            $statement = $this->db->prepare(
+                "SELECT id, display_name FROM players WHERE id IN ({$placeholders})"
+            );
+            $statement->execute($playerIds);
+            foreach ($statement->fetchAll() as $player) {
+                $names[(int) $player['id']] = $player['display_name'];
+            }
+        }
+
+        foreach (['A', 'B'] as $division) {
+            $directByNumber = [];
+            $nameByNumber = [];
+            foreach ($participants[$division] as $participant) {
+                $number = (int) $participant['numero'];
+                $directByNumber[$number] = !empty($participant['wo_direto']);
+                $nameByNumber[$number] = $names[(int) $participant['jogador_id']] ?? "Jogador {$number}";
+            }
+            foreach ($rounds[$division] as &$round) {
+                foreach ($round['partidas'] as &$match) {
+                    $number1 = (int) $match['numero1'];
+                    $number2 = (int) $match['numero2'];
+                    $direct1 = !empty($directByNumber[$number1]);
+                    $direct2 = !empty($directByNumber[$number2]);
+                    if (!$direct1 && !$direct2) {
+                        continue;
+                    }
+                    $score1 = $match['placar1'] ?? null;
+                    $score2 = $match['placar2'] ?? null;
+                    $notes = trim((string) ($match['observacao'] ?? ''));
+                    $previousWoAgainst2 = $direct1 && $score1 === 2 && $score2 === 0 && str_starts_with($notes, 'W.O.:');
+                    $previousWoAgainst1 = $direct2 && $score1 === 0 && $score2 === 2 && str_starts_with($notes, 'W.O.:');
+                    $both = ($direct1 && $direct2) || $previousWoAgainst1 || $previousWoAgainst2 ||
+                        $notes === 'W.O.: ambos abandonaram a competição';
+                    $match['status'] = 'E';
+                    $match['wo_automatico'] = true;
+                    if ($both) {
+                        $match['placar1'] = 0;
+                        $match['placar2'] = 0;
+                        $match['observacao'] = 'W.O.: ambos abandonaram a competição';
+                    } elseif ($direct1) {
+                        $match['placar1'] = 0;
+                        $match['placar2'] = 2;
+                        $match['observacao'] = "W.O.: {$nameByNumber[$number1]}";
+                    } else {
+                        $match['placar1'] = 2;
+                        $match['placar2'] = 0;
+                        $match['observacao'] = "W.O.: {$nameByNumber[$number2]}";
+                    }
+                }
+                unset($match);
+            }
+            unset($round);
+        }
+        return $rounds;
+    }
+
+    private function applyStoredDirectWo(int $seasonId, string $division): void
+    {
+        $statement = $this->db->prepare(<<<'SQL'
+            SELECT m.id, m.score1, m.score2, m.notes,
+                   p1.direct_wo AS direct1, p2.direct_wo AS direct2,
+                   j1.display_name AS name1, j2.display_name AS name2
+            FROM matches m
+            JOIN rounds r ON r.id = m.round_id
+            JOIN participants p1 ON p1.id = m.participant1_id
+            JOIN participants p2 ON p2.id = m.participant2_id
+            JOIN players j1 ON j1.id = p1.player_id
+            JOIN players j2 ON j2.id = p2.player_id
+            WHERE r.season_id = :season_id AND r.division = :division
+              AND (p1.direct_wo = 1 OR p2.direct_wo = 1)
+            FOR UPDATE
+        SQL);
+        $statement->execute(['season_id' => $seasonId, 'division' => $division]);
+        $update = $this->db->prepare(<<<'SQL'
+            UPDATE matches
+            SET status = 'E', score1 = :score1, score2 = :score2, notes = :notes,
+                row_version = row_version + 1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = :id
+        SQL);
+        foreach ($statement->fetchAll() as $match) {
+            $direct1 = (bool) $match['direct1'];
+            $direct2 = (bool) $match['direct2'];
+            $score1 = $match['score1'] === null ? null : (int) $match['score1'];
+            $score2 = $match['score2'] === null ? null : (int) $match['score2'];
+            $notes = trim((string) $match['notes']);
+            $both = ($direct1 && $direct2) ||
+                ($direct1 && $score1 === 2 && $score2 === 0 && str_starts_with($notes, 'W.O.:')) ||
+                ($direct2 && $score1 === 0 && $score2 === 2 && str_starts_with($notes, 'W.O.:')) ||
+                $notes === 'W.O.: ambos abandonaram a competição';
+            $update->execute([
+                'score1' => $both || $direct1 ? 0 : 2,
+                'score2' => $both || $direct2 ? 0 : 2,
+                'notes' => $both
+                    ? 'W.O.: ambos abandonaram a competição'
+                    : 'W.O.: ' . ($direct1 ? $match['name1'] : $match['name2']),
+                'id' => $match['id'],
+            ]);
+        }
+    }
+
     private function persistSeasonContent(
         int $seasonId,
         array $participants,
@@ -1664,9 +1797,9 @@ final class AdminService
         );
         $insertParticipant = $this->db->prepare(<<<'SQL'
             INSERT INTO participants
-              (season_id, division, number, player_id, tiebreak_priority)
+              (season_id, division, number, player_id, tiebreak_priority, direct_wo)
             VALUES
-              (:season_id, :division, :number, :player_id, :tiebreak_priority)
+              (:season_id, :division, :number, :player_id, :tiebreak_priority, :direct_wo)
         SQL);
         $participantIds = ['A' => [], 'B' => []];
         foreach (['A', 'B'] as $division) {
@@ -1681,6 +1814,7 @@ final class AdminService
                     'number' => $participant['numero'],
                     'player_id' => $participant['jogador_id'],
                     'tiebreak_priority' => $participant['desempate'],
+                    'direct_wo' => !empty($participant['wo_direto']) ? 1 : 0,
                 ]);
                 $participantIds[$division][$participant['numero']] =
                     (int) $this->db->lastInsertId();
@@ -1718,6 +1852,7 @@ final class AdminService
                 ]);
                 $roundId = (int) $this->db->lastInsertId();
                 foreach ($round['partidas'] as $index => $match) {
+                    $keepResult = $preserveResults || !empty($match['wo_automatico']);
                     $insertMatch->execute([
                         'round_id' => $roundId,
                         'match_order' => $index + 1,
@@ -1725,10 +1860,10 @@ final class AdminService
                         'participant2_id' => $participantIds[$division][$match['numero2']],
                         'scheduled_date' => $match['data'],
                         'scheduled_time' => $match['hora'],
-                        'status' => $preserveResults ? $match['status'] : 'A',
-                        'score1' => $preserveResults ? $match['placar1'] : null,
-                        'score2' => $preserveResults ? $match['placar2'] : null,
-                        'notes' => $preserveResults ? $match['observacao'] : '',
+                        'status' => $keepResult ? $match['status'] : 'A',
+                        'score1' => $keepResult ? $match['placar1'] : null,
+                        'score2' => $keepResult ? $match['placar2'] : null,
+                        'notes' => $keepResult ? $match['observacao'] : '',
                     ]);
                 }
             }
@@ -1745,6 +1880,7 @@ final class AdminService
                 'numero' => $index + 1,
                 'jogador_id' => (int) $player['jogador_id'],
                 'desempate' => null,
+                'wo_direto' => false,
             ],
             $classification,
             array_keys($classification),

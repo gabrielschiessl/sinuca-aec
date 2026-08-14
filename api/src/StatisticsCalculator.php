@@ -28,6 +28,7 @@ final class StatisticsCalculator
                 'resultados' => [],
                 '_prioridade' => $participant['tiebreak_priority'] === null
                     ? null : (int) $participant['tiebreak_priority'],
+                '_wo_direto' => (bool) ($participant['direct_wo'] ?? false),
             ];
         }
 
@@ -74,6 +75,9 @@ final class StatisticsCalculator
             if ($result !== 0) {
                 return $result;
             }
+            if ($a['_wo_direto'] !== $b['_wo_direto']) {
+                return $a['_wo_direto'] ? 1 : -1;
+            }
             $priorityA = $a['_prioridade'] ?? PHP_INT_MAX;
             $priorityB = $b['_prioridade'] ?? PHP_INT_MAX;
             if ($priorityA !== $priorityB) {
@@ -91,10 +95,14 @@ final class StatisticsCalculator
             $player['posicao'] = $index + 1;
             $player['zona'] = self::zone($division, $index + 1, $count);
             unset($player['_prioridade']);
+            $player['wo_direto'] = $player['_wo_direto'];
+            unset($player['_wo_direto']);
         }
         unset($player);
         foreach ($players as &$player) {
             unset($player['_prioridade']);
+            $player['wo_direto'] = $player['_wo_direto'];
+            unset($player['_wo_direto']);
         }
 
         return [

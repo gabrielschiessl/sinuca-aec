@@ -135,7 +135,8 @@ final class PublicService
                 ];
                 $classifications[$year][$playerId] = [
                     'posicao' => $index + 1,
-                    'pontos' => $total - $index,
+                    'pontos' => !empty($player['wo_direto']) ? 0 : $total - $index,
+                    'wo_direto' => !empty($player['wo_direto']),
                 ];
             }
         }
@@ -146,22 +147,29 @@ final class PublicService
         foreach (range($firstEvaluationYear, $referenceYear) as $evaluationYear) {
             $windowStart = $evaluationYear - 4;
             $points = [];
+            $directWo = [];
             foreach ($classifications as $seasonYear => $classification) {
                 if ($seasonYear < $windowStart || $seasonYear > $evaluationYear) {
                     continue;
                 }
                 foreach ($classification as $playerId => $result) {
                     $points[$playerId] = ($points[$playerId] ?? 0) + $result['pontos'];
+                    if (!empty($result['wo_direto'])) {
+                        $directWo[$playerId] = true;
+                    }
                 }
             }
             $candidateIds = array_values(array_unique([
                 ...array_keys($points),
                 ...array_keys($previousRanking),
             ]));
-            usort($candidateIds, function (int $playerA, int $playerB) use ($points, $previousRanking, $players): int {
+            usort($candidateIds, function (int $playerA, int $playerB) use ($points, $directWo, $previousRanking, $players): int {
                 $difference = ($points[$playerB] ?? 0) <=> ($points[$playerA] ?? 0);
                 if ($difference !== 0) {
                     return $difference;
+                }
+                if (($points[$playerA] ?? 0) === 0 && isset($directWo[$playerA]) !== isset($directWo[$playerB])) {
+                    return isset($directWo[$playerA]) ? 1 : -1;
                 }
                 $previousA = $previousRanking[$playerA] ?? PHP_INT_MAX;
                 $previousB = $previousRanking[$playerB] ?? PHP_INT_MAX;
@@ -260,7 +268,7 @@ final class PublicService
     private function participants(int $year, string $division): array
     {
         $statement = $this->db->prepare(<<<'SQL'
-            SELECT p.id AS participant_id, p.number, p.tiebreak_priority,
+            SELECT p.id AS participant_id, p.number, p.tiebreak_priority, p.direct_wo,
                    j.id AS player_id, j.name, j.display_name, j.nickname
             FROM participants p
             JOIN seasons s ON s.id = p.season_id
