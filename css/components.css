@@ -1216,7 +1216,7 @@
 .admin-draw-preview p span:first-child { text-align:right; }
 .admin-draw-preview p span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .btn-admin-danger { background:#991b1b; }
-.admin-module-note { margin:-4px 0 16px; padding:10px 12px; border-radius:8px; background:rgba(255,255,255,.04); color:var(--text-muted); font-size:.78rem; line-height:1.45; }
+.admin-module-note { margin:10px 0 16px; padding:10px 12px; border-radius:8px; background:rgba(255,255,255,.04); color:var(--text-muted); font-size:.78rem; line-height:1.45; }
 .admin-participant-row { padding:11px 12px; display:grid; grid-template-columns:46px minmax(0,1fr); align-items:end; gap:12px; border-bottom:1px solid var(--border); background:var(--group-bg); }
 .admin-participant-row.has-tiebreak { grid-template-columns:46px minmax(0,1fr) 112px 72px; }
 .admin-participant-tiebreak .admin-input { width:100%; }
