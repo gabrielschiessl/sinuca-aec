@@ -102,6 +102,16 @@ final class PublicService
             ? (int) $configured
             : $currentYear - 1;
 
+        return [
+            'temporada_atual' => $currentYear,
+            'referencia_automatica' => !($configured !== false && ctype_digit((string) $configured)),
+            ...$this->rankingForReference($referenceYear),
+        ];
+    }
+
+    public function rankingForReference(int $referenceYear): array
+    {
+
         $seasonStatement = $this->db->prepare(<<<'SQL'
             SELECT DISTINCT s.year
             FROM seasons s
@@ -143,6 +153,7 @@ final class PublicService
 
         $previousRanking = [];
         $ranking = [];
+        $rankingDetails = [];
         $firstEvaluationYear = $seasonYears ? min($seasonYears) : $referenceYear;
         foreach (range($firstEvaluationYear, $referenceYear) as $evaluationYear) {
             $windowStart = $evaluationYear - 4;
@@ -182,6 +193,9 @@ final class PublicService
                 );
                 return $nameDifference !== 0 ? $nameDifference : $playerA <=> $playerB;
             });
+            if ($evaluationYear === $referenceYear) {
+                $rankingDetails = $candidateIds;
+            }
             $candidateIds = array_slice($candidateIds, 0, 30);
             $previousRanking = [];
             foreach ($candidateIds as $index => $playerId) {
@@ -193,34 +207,36 @@ final class PublicService
         }
 
         $period = range($referenceYear - 4, $referenceYear);
-        $rows = [];
-        foreach ($ranking as $index => $playerId) {
-            $seasons = [];
-            $totalPoints = 0;
-            foreach ($period as $year) {
-                $result = $classifications[$year][$playerId] ?? null;
-                $points = (int) ($result['pontos'] ?? 0);
-                $totalPoints += $points;
-                $seasons[] = [
-                    'temporada' => $year,
-                    'posicao' => $result['posicao'] ?? null,
-                    'pontos' => $points,
+        $buildRows = static function (array $playerIds) use ($period, $classifications, $players): array {
+            $rows = [];
+            foreach ($playerIds as $index => $playerId) {
+                $seasons = [];
+                $totalPoints = 0;
+                foreach ($period as $year) {
+                    $result = $classifications[$year][$playerId] ?? null;
+                    $points = (int) ($result['pontos'] ?? 0);
+                    $totalPoints += $points;
+                    $seasons[] = [
+                        'temporada' => $year,
+                        'posicao' => $result['posicao'] ?? null,
+                        'pontos' => $points,
+                    ];
+                }
+                $rows[] = [
+                    'posicao' => $index + 1,
+                    ...$players[$playerId],
+                    'pontos' => $totalPoints,
+                    'temporadas' => $seasons,
                 ];
             }
-            $rows[] = [
-                'posicao' => $index + 1,
-                ...$players[$playerId],
-                'pontos' => $totalPoints,
-                'temporadas' => $seasons,
-            ];
-        }
+            return $rows;
+        };
 
         return [
-            'temporada_atual' => $currentYear,
             'referencia' => $referenceYear,
-            'referencia_automatica' => !($configured !== false && ctype_digit((string) $configured)),
             'periodo' => $period,
-            'ranking' => $rows,
+            'ranking' => $buildRows($ranking),
+            'detalhes' => $buildRows($rankingDetails),
         ];
     }
 

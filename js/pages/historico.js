@@ -7,7 +7,6 @@ import { classificationTable } from "../components/classificationTable.js";
 import { resultsTable } from "../components/resultsTable.js";
 import { initFilters } from "../utils/filterController.js";
 import { getEstatisticas, getRodadas, getTemporadas } from "../api.js";
-import { initPdfExportButtons } from "../utils/pdfExporter.js";
 import { resetPageScroll } from "../utils/pageScroll.js";
 
 export async function renderHistorico() {
@@ -27,18 +26,14 @@ export async function renderHistorico() {
             <label><span>Divisão</span><select class="round-select" data-history-division><option value="A">Série A</option><option value="B">Série B</option></select></label>
           </div>
         </div>
-        <section id="historico-rodadas"><div class="history-export-toolbar"><button class="btn pdf-export-button" type="button" data-pdf-export="rounds" data-pdf-source="[data-history-rounds]"><i class="bi bi-file-earmark-pdf"></i> Exportar PDF</button></div><div data-history-rounds><div class="loading-state"><span class="loading-spinner"></span><span>Carregando temporadas...</span></div></div></section>
-        <section id="historico-classificacao" style="display:none"><div class="history-export-toolbar"><button class="btn pdf-export-button" type="button" data-pdf-export="classification" data-pdf-source="[data-history-classification]"><i class="bi bi-file-earmark-pdf"></i> Exportar PDF</button></div><div class="stats-panel" data-history-classification></div></section>
-        <section id="historico-resultados" style="display:none"><div class="history-export-toolbar"><button class="btn pdf-export-button" type="button" data-pdf-export="results" data-pdf-source="[data-history-results]"><i class="bi bi-file-earmark-pdf"></i> Exportar PDF</button></div><div class="stats-panel" data-history-results></div></section>
+        <section id="historico-rodadas"><div data-history-rounds><div class="loading-state"><span class="loading-spinner"></span><span>Carregando temporadas...</span></div></div></section>
+        <section id="historico-classificacao" style="display:none"><div class="stats-panel" data-history-classification></div></section>
+        <section id="historico-resultados" style="display:none"><div class="stats-panel" data-history-results></div></section>
       </div>
       ${renderFooter("footer-light")}
     </main>`;
 
   initHistoryTabs(app);
-  initPdfExportButtons(app, () => ({
-    division: app.querySelector("[data-history-division]")?.value,
-    season: app.querySelector("[data-history-season]")?.value,
-  }));
   try {
     const data = await getTemporadas();
     if (!app.querySelector("[data-history-season]")) return;

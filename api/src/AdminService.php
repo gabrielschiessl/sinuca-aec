@@ -275,7 +275,8 @@ final class AdminService
         SQL);
         $matchStatement->execute(['season_id' => $season['id'], 'division' => $division]);
         $finishedMatches = $matchStatement->fetchAll();
-        $rounds = $this->draftSchedule((int) $season['id'])[$division];
+        $schedule = $this->draftSchedule((int) $season['id']);
+        $rounds = $schedule[$division];
         $statistics = StatisticsCalculator::calculate(
             (int) $year,
             $division,
@@ -283,6 +284,34 @@ final class AdminService
             $finishedMatches,
             count($rounds),
         );
+        $movementStatistics = [$division => $statistics];
+        foreach (['A', 'B'] as $movementDivision) {
+            if (isset($movementStatistics[$movementDivision])) {
+                continue;
+            }
+            $participantStatement->execute([
+                'season_id' => $season['id'],
+                'division' => $movementDivision,
+            ]);
+            $movementParticipants = $participantStatement->fetchAll();
+            if (count($movementParticipants) < 2) {
+                continue;
+            }
+            $matchStatement->execute([
+                'season_id' => $season['id'],
+                'division' => $movementDivision,
+            ]);
+            $movementStatistics[$movementDivision] = StatisticsCalculator::calculate(
+                (int) $year,
+                $movementDivision,
+                $movementParticipants,
+                $matchStatement->fetchAll(),
+                count($schedule[$movementDivision] ?? []),
+            );
+        }
+        $promoted = array_slice($movementStatistics['B']['classificacao'] ?? [], 0, 4);
+        $relegatedClassification = $movementStatistics['A']['classificacao'] ?? [];
+        $relegated = array_slice($relegatedClassification, -4);
         $playersByNumber = [];
         foreach ($participants as $participant) {
             $playersByNumber[(int) $participant['number']] = [
@@ -309,6 +338,13 @@ final class AdminService
         );
         $feeStatement->execute(['setting_key' => 'taxa_inscricao_' . $year]);
         $fee = $feeStatement->fetchColumn();
+        $rankingExport = null;
+        if ($division === 'A') {
+            $rankingExport = [
+                'anterior' => $this->public->rankingForReference((int) $year - 1),
+                'atualizado' => $this->public->rankingForReference((int) $year),
+            ];
+        }
         return [
             'temporada' => (int) $year,
             'divisao' => $division,
@@ -318,6 +354,17 @@ final class AdminService
             'participantes' => array_values($playersByNumber),
             'rodadas' => $rounds,
             'estatisticas' => $statistics,
+            'ranking_exportacao' => $rankingExport,
+            'movimentacoes' => [
+                'subiram' => array_map(
+                    static fn (array $player): string => (string) $player['exibicao'],
+                    $promoted,
+                ),
+                'cairam' => array_map(
+                    static fn (array $player): string => (string) $player['exibicao'],
+                    $relegated,
+                ),
+            ],
         ];
     }
 

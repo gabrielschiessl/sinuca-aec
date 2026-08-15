@@ -250,40 +250,6 @@
   background: var(--border);
 }
 
-.section-heading-actions { max-width:980px; margin:auto; display:flex; align-items:center; gap:14px; }
-.section-heading-actions .section-heading-title { min-width:0; flex:1; }
-.pdf-export-button { min-height:38px; padding:8px 13px; display:inline-flex; align-items:center; justify-content:center; gap:7px; white-space:nowrap; font-size:.78rem; }
-.history-export-toolbar { margin:18px 0 4px; display:flex; justify-content:flex-end; }
-.pdf-export-root { display:none; }
-.pdf-export-root.is-preparing { position:fixed; top:0; left:-100000px; z-index:-1; display:block; width:max-content; max-width:none; visibility:hidden; }
-.pdf-export-root.is-preparing .pdf-export-content,.pdf-export-root.is-preparing table { width:max-content; max-width:none; }
-
-@media (max-width: 480px) {
-  .section-heading-actions { align-items:stretch; flex-direction:column; }
-  .section-heading-actions .pdf-export-button,.history-export-toolbar .pdf-export-button { width:100%; }
-  .history-export-toolbar { justify-content:stretch; }
-}
-
-@media print {
-  html,body { width:auto !important; min-width:0 !important; height:auto !important; overflow:visible !important; background:#10070b !important; }
-  body > :not(.pdf-export-root) { display:none !important; }
-  .pdf-export-root { box-sizing:border-box; display:block !important; color:#f1edee; background:#10070b; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
-  .pdf-export-header { margin:0 0 8mm; padding:0 0 4mm; border-bottom:2px solid #7d5161; }
-  .pdf-export-header h1 { margin:0; color:#f1edee; font-family:"Barlow Condensed",sans-serif; font-size:18pt; }
-  .pdf-export-header p { margin:2mm 0 0; color:#b197a0; font-size:9pt; }
-  .pdf-export-content { width:100%; }
-  .pdf-export-content .round-group { width:100%; margin:0 0 6mm; padding:5mm; overflow:visible; box-shadow:none; break-inside:auto; page-break-inside:auto; }
-  .pdf-export-content .round-header { break-after:avoid; page-break-after:avoid; }
-  .pdf-export-content .match-card { break-inside:avoid; page-break-inside:avoid; box-shadow:none; }
-  .pdf-export-content table { width:100% !important; min-width:0 !important; table-layout:auto; font-size:8pt; }
-  .pdf-export-content th,.pdf-export-content td { position:static !important; min-width:0 !important; width:auto !important; padding:2.2mm 2mm !important; }
-  .pdf-export-content th::after,.pdf-export-content td::after { display:none !important; }
-  .pdf-export-results table { table-layout:fixed; font-size:6.5pt; }
-  .pdf-export-results th,.pdf-export-results td { padding:1.5mm .8mm !important; }
-  .pdf-export-results .results-player { width:25mm !important; max-width:25mm !important; white-space:normal; }
-  .pdf-export-results .result-marker { width:6mm; height:6mm; border-radius:1.5mm; font-size:6pt; }
-}
-
 .player {
   font-weight: 600;
 }

@@ -367,11 +367,13 @@ function renderDashboard(session) {
         <div class="admin-spreadsheet-actions"><button class="btn btn-admin-secondary" type="button" data-spreadsheet-select-all>Selecionar todas</button><button class="btn btn-admin-secondary" type="button" data-spreadsheet-clear>Limpar seleção</button></div>
         <div class="admin-spreadsheet-groups">
           ${spreadsheetGroup("cadastros", "Cadastros", "bi-person-vcard-fill", [["jogadores", "Jogadores"], ["inscricao", "Ficha de inscrição"]])}
-          ${spreadsheetGroup("estatisticas", "Estatísticas", "bi-bar-chart-fill", [["classificacao", "Classificação", "updated-only"], ["vitorias", "Vitórias"], ["resultados", "Resultados"], ["partidas", "Partidas vencidas"]])}
+          ${spreadsheetGroup("estatisticas", "Estatísticas", "bi-bar-chart-fill", [["classificacao-simples", "Classificação simples", "updated-only"], ["classificacao", "Classificação", "updated-only"], ["vitorias", "Vitórias"], ["resultados", "Resultados", "updated-only"], ["partidas", "Partidas vencidas"], ["ranking", "Ranking", "updated-series-a-only"]])}
           ${spreadsheetGroup("jogos", "Jogos", "bi-calendar3", [["rodadas", "Rodadas (todas as folhas)"], ["individuais", "Fichas individuais"]])}
           <details class="admin-spreadsheet-group" data-spreadsheet-final-group hidden><summary><span><i class="bi bi-trophy-fill"></i> Documentos finais</span><i class="bi bi-chevron-down"></i></summary><div></div></details>
         </div>
-        <div class="admin-season-actions"><button class="btn" type="button" data-generate-spreadsheet><i class="bi bi-download"></i> Gerar planilha</button></div>
+        <div class="admin-season-actions">
+          <button class="btn" type="button" data-generate-spreadsheet><i class="bi bi-file-earmark-spreadsheet"></i> Gerar planilha</button>
+        </div>
       </section>
 
     </section>
@@ -580,24 +582,26 @@ function updateSpreadsheetConfiguration() {
   });
   if (counts[divisionSelect.value] === 0) divisionSelect.value = counts.A ? "A" : "B";
 
-  const historical = season.status === "ARQUIVADA" || season.tipo === "LEGADA" || Number(season.temporada) < spreadsheetCurrentSeason;
-  const manualOption = versionSelect.querySelector('option[value="manual"]');
-  manualOption.disabled = historical;
-  if (historical && versionSelect.value === "manual") versionSelect.value = "updated";
-  note.innerHTML = historical
-    ? '<i class="bi bi-info-circle"></i> Temporadas históricas geram somente a versão atualizada e completa.'
-    : versionSelect.value === "manual"
-      ? '<i class="bi bi-pencil-square"></i> A versão manual deixa placares e quadros estatísticos em branco para preenchimento à mão.'
-      : '<i class="bi bi-database-check"></i> A versão atualizada utiliza o estado atual do banco de dados.';
-
-  const classification = page.querySelector('[data-spreadsheet-sheet][value="classificacao"]');
-  const classificationLabel = classification?.closest("label");
   const manual = versionSelect.value === "manual";
-  if (classification) {
-    classification.disabled = manual;
-    classification.checked = !manual;
-  }
-  classificationLabel?.classList.toggle("is-disabled", manual);
+  note.innerHTML = manual
+    ? '<i class="bi bi-pencil-square"></i> A versão manual deixa placares e quadros estatísticos em branco para preenchimento à mão.'
+    : '<i class="bi bi-database-check"></i> A versão atualizada utiliza o estado atual do banco de dados.';
+
+  page.querySelectorAll('[data-spreadsheet-restriction="updated-only"]').forEach((label) => {
+    const checkbox = label.querySelector("[data-spreadsheet-sheet]");
+    if (!checkbox) return;
+    checkbox.disabled = manual;
+    checkbox.checked = !manual;
+    label.classList.toggle("is-disabled", manual);
+  });
+  page.querySelectorAll('[data-spreadsheet-restriction="updated-series-a-only"]').forEach((label) => {
+    const checkbox = label.querySelector("[data-spreadsheet-sheet]");
+    if (!checkbox) return;
+    const disabled = manual || divisionSelect.value !== "A";
+    checkbox.disabled = disabled;
+    checkbox.checked = !disabled;
+    label.classList.toggle("is-disabled", disabled);
+  });
   feeInput.value = season.taxa_inscricao === null || season.taxa_inscricao === undefined ? "" : Number(season.taxa_inscricao).toFixed(2);
   feeInput.dataset.savedValue = feeInput.value;
   feeInput.disabled = !adminEditMode;
@@ -650,12 +654,16 @@ async function generateSpreadsheet(event) {
   try {
     const data = await getAdminDadosPlanilha(activeAdminSession.token, season.temporada, division);
     await exportChampionshipSpreadsheet(data, { version, sheets });
-    showAdminModal("Planilha gerada", `O arquivo da Série ${division} de ${season.temporada} foi preparado para download.`, "success");
+    showAdminModal(
+      "Planilha gerada",
+      `O arquivo da Série ${division} de ${season.temporada} foi preparado para download.`,
+      "success",
+    );
   } catch (error) {
     showAdminModal("Não foi possível gerar", error.message, "error");
   } finally {
     button.disabled = false;
-    button.innerHTML = '<i class="bi bi-download"></i> Gerar planilha';
+    button.innerHTML = '<i class="bi bi-file-earmark-spreadsheet"></i> Gerar planilha';
   }
 }
 
