@@ -24,6 +24,7 @@ import {
   saveAdminRoundDate,
   saveAdminRoundDates,
   saveAdminTemporada,
+  saveAdminTemporadaAtual,
   saveAdminTemporadaLegada,
   saveAdminTaxaInscricao,
   saveAdminRankingReference,
@@ -693,7 +694,7 @@ function renderSeasonList(data) {
     <article class="admin-season-summary ${season.status === "ATIVA" ? "is-current" : ""}">
       <div><strong>Temporada ${season.temporada}</strong><span>${season.status === "ATIVA" ? "Atual e publicada" : season.status === "ARQUIVADA" ? "Temporada histórica" : season.tipo === "LEGADA" ? "Rascunho histórico" : "Preparação salva"}</span></div>
       <small>Série A: ${season.participantes_a} · Série B: ${season.participantes_b}</small>
-      ${season.status === "PREPARACAO" || (season.status === "ARQUIVADA" && season.tipo === "LEGADA") ? `<button class="btn btn-admin-secondary" type="button" data-edit-season="${season.temporada}">Editar</button>` : ""}
+      ${season.status === "ATIVA" || season.status === "PREPARACAO" || (season.status === "ARQUIVADA" && season.tipo === "LEGADA") ? `<button class="btn btn-admin-secondary" type="button" data-edit-season="${season.temporada}">Editar</button>` : ""}
     </article>`).join("");
   const used = new Set(seasons.map((season) => Number(season.temporada)));
   const start = Math.max(Number(data.ano_minimo), Number(data.temporada_atual) + 1);
@@ -775,7 +776,7 @@ function selectLegacySeasonSpreadsheet() {
 }
 
 function selectLegacySeasonSpreadsheetForEditor() {
-  if (!adminEditMode || seasonDraft?.modo !== "LEGADA") return;
+  if (!adminEditMode || !seasonDraft) return;
   legacySpreadsheetTarget = "editor";
   getPage()?.querySelector("[data-season-legacy-file]")?.click();
 }
@@ -784,7 +785,7 @@ async function importLegacySeasonSpreadsheet(event) {
   const file = event.currentTarget.files?.[0];
   event.currentTarget.value = "";
   if (!file) return;
-  const editingExisting = legacySpreadsheetTarget === "editor" && seasonDraft?.modo === "LEGADA";
+  const editingExisting = legacySpreadsheetTarget === "editor" && Boolean(seasonDraft);
   const year = editingExisting
     ? Number(seasonDraft.temporada)
     : Number(getPage()?.querySelector("[data-season-legacy-year]")?.value);
@@ -804,7 +805,7 @@ async function importLegacySeasonSpreadsheet(event) {
     const importedDraft = {
       ...base,
       persistida: editingExisting ? base.persistida : false,
-      modo: "LEGADA",
+      modo: editingExisting ? base.modo : "LEGADA",
       participantes: imported.participantes,
       rodadas: imported.rodadas,
     };
@@ -1155,13 +1156,14 @@ function renderSeasonEditor() {
       ${division === "B" ? '<button class="btn btn-admin-secondary" type="button" data-remove-season-player aria-label="Remover participante"><i class="bi bi-trash"></i></button>' : ""}
     </div>`).join("");
   const publishedLegacy = seasonDraft.modo === "LEGADA" && seasonDraft.status === "ARQUIVADA";
-  const persistedControls = seasonDraft.persistida && !publishedLegacy
+  const activeSeason = seasonDraft.modo === "ATUAL";
+  const persistedControls = seasonDraft.persistida && !publishedLegacy && !activeSeason
     ? `<div class="admin-season-editor-controls"><button class="btn" type="button" data-activate-season>${seasonDraft.modo === "LEGADA" ? "Publicar" : "Ativar temporada"}</button><button class="btn btn-admin-danger" type="button" data-delete-season>Excluir temporada</button></div>`
     : "";
   editor.hidden = false;
   editor.innerHTML = `
-    <div class="admin-season-editor-heading"><div><strong>Temporada ${seasonDraft.temporada}</strong><span>${publishedLegacy ? "Temporada histórica publicada" : seasonDraft.modo === "LEGADA" ? seasonDraft.persistida ? "Rascunho histórico salvo" : "Cadastro de temporada passada" : seasonDraft.persistida ? "Preparação salva" : "Novo rascunho não salvo"}</span></div>${persistedControls}</div>
-    ${seasonDraft.modo === "LEGADA" ? `<div class="admin-season-editor-controls"><button class="btn btn-admin-secondary" type="button" data-import-season-spreadsheet ${adminEditMode ? "" : "disabled"}><i class="bi bi-file-earmark-arrow-up"></i> Importar/atualizar planilha</button></div>` : ""}
+    <div class="admin-season-editor-heading"><div><strong>Temporada ${seasonDraft.temporada}</strong><span>${activeSeason ? "Temporada atual publicada" : publishedLegacy ? "Temporada histórica publicada" : seasonDraft.modo === "LEGADA" ? seasonDraft.persistida ? "Rascunho histórico salvo" : "Cadastro de temporada passada" : seasonDraft.persistida ? "Preparação salva" : "Novo rascunho não salvo"}</span></div>${persistedControls}</div>
+    <div class="admin-season-editor-controls"><button class="btn btn-admin-secondary" type="button" data-import-season-spreadsheet ${adminEditMode ? "" : "disabled"}><i class="bi bi-file-earmark-arrow-up"></i> Importar/atualizar planilha</button></div>
     ${seasonDraft.modo === "LEGADA" ? '<p class="admin-season-tiebreak-note"><strong>Desempate interno:</strong> use 1, 2, 3… somente para definir a ordem manual entre jogadores com os mesmos números de vitórias e partidas ganhas. Essa prioridade não aparece no site público.</p>' : ""}
     <p class="admin-season-tiebreak-note"><strong>W.O. direto:</strong> o participante não pontuará neste ano no Ranking. Ao salvar, seus confrontos serão encerrados como derrota por W.O.; contra outro participante marcado, o resultado será 0 × 0.</p>
     <div class="admin-season-divisions">
@@ -1169,7 +1171,7 @@ function renderSeasonEditor() {
       <section><h3>Série B <small>${seasonDraft.participantes.B.length} participantes${seasonDraft.modo === "LEGADA" ? " (opcional)" : ""}</small></h3><div data-season-list="B">${rows("B")}</div><button class="btn btn-admin-secondary admin-season-add" type="button" data-add-season-player ${adminEditMode ? "" : "disabled"}><i class="bi bi-person-plus"></i> Adicionar participante</button></section>
     </div>
     ${renderSeasonSchedulePreview()}
-    <div class="admin-season-actions"><button class="btn btn-admin-secondary" type="button" data-cancel-season>Cancelar alterações</button><button class="btn" type="button" data-save-season ${adminEditMode ? "" : "disabled"}>${publishedLegacy ? "Salvar alterações" : seasonDraft.modo === "LEGADA" ? "Salvar rascunho" : "Salvar temporada"}</button></div>`;
+    <div class="admin-season-actions"><button class="btn btn-admin-secondary" type="button" data-cancel-season>Cancelar alterações</button><button class="btn" type="button" data-save-season ${adminEditMode ? "" : "disabled"}>${activeSeason || publishedLegacy ? "Salvar alterações" : seasonDraft.modo === "LEGADA" ? "Salvar rascunho" : "Salvar temporada"}</button></div>`;
   editor.querySelectorAll("[data-season-participant] select").forEach((select) => select.addEventListener("change", syncSeasonDraftFromEditor));
   editor.querySelectorAll("[data-season-tiebreak]").forEach((input) => input.addEventListener("change", syncSeasonDraftFromEditor));
   editor.querySelectorAll("[data-season-wo]").forEach((input) => input.addEventListener("change", syncSeasonDraftFromEditor));
@@ -1690,10 +1692,13 @@ async function saveSeasonChanges() {
   const ids = [...seasonDraft.participantes.A, ...seasonDraft.participantes.B].map((item) => item.jogador_id);
   if (new Set(ids).size !== ids.length) return showAdminModal("Jogador duplicado", "Cada jogador pode ocupar somente uma vaga na temporada.", "error");
   const legacy = seasonDraft.modo === "LEGADA";
+  const activeSeason = seasonDraft.modo === "ATUAL";
   const publishedLegacy = legacy && seasonDraft.status === "ARQUIVADA";
   const confirmed = await confirmAdminChange(
-    publishedLegacy ? "Salvar alterações no Histórico?" : legacy ? "Salvar rascunho histórico?" : "Salvar preparação?",
-    publishedLegacy
+    activeSeason ? "Salvar alterações na temporada atual?" : publishedLegacy ? "Salvar alterações no Histórico?" : legacy ? "Salvar rascunho histórico?" : "Salvar preparação?",
+    activeSeason
+      ? `Participantes, chaveamento, datas e horários da temporada ${seasonDraft.temporada} serão atualizados. Resultados válidos dos confrontos preservados serão mantidos.`
+      : publishedLegacy
       ? `A temporada ${seasonDraft.temporada} continuará publicada e o Histórico será atualizado com estes dados.`
       : legacy
       ? `O cadastro de ${seasonDraft.temporada} será salvo como rascunho e ainda não aparecerá no Histórico.`
@@ -1702,18 +1707,21 @@ async function saveSeasonChanges() {
   if (!confirmed) return;
   try {
     const savedYear = seasonDraft.temporada;
-    const save = legacy ? saveAdminTemporadaLegada : saveAdminTemporada;
-    const data = await save(
-      activeAdminSession.token,
-      seasonDraft.temporada,
-      seasonDraft.participantes,
-      getEffectiveSeasonSchedules(),
-    );
+    const data = activeSeason
+      ? await saveAdminTemporadaAtual(activeAdminSession.token, seasonDraft.participantes, getEffectiveSeasonSchedules())
+      : await (legacy ? saveAdminTemporadaLegada : saveAdminTemporada)(
+        activeAdminSession.token,
+        seasonDraft.temporada,
+        seasonDraft.participantes,
+        getEffectiveSeasonSchedules(),
+      );
     setSeasonDraft(data);
     await loadAdminSeasons();
     showAdminModal(
-      publishedLegacy ? "Temporada histórica atualizada" : legacy ? "Rascunho histórico salvo" : "Temporada salva",
-      publishedLegacy
+      activeSeason ? "Temporada atualizada" : publishedLegacy ? "Temporada histórica atualizada" : legacy ? "Rascunho histórico salvo" : "Temporada salva",
+      activeSeason
+        ? "As alterações da temporada atual foram salvas."
+        : publishedLegacy
         ? `As alterações de ${savedYear} foram salvas e já estão disponíveis no Histórico.`
         : legacy
         ? `O cadastro de ${savedYear} foi salvo e ainda não está publicado no Histórico.`

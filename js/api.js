@@ -206,6 +206,13 @@ export function saveAdminTemporada(token, temporada, participantes, rodadas) {
   });
 }
 
+export function saveAdminTemporadaAtual(token, participantes, rodadas) {
+  return post({ acao: "salvar_temporada_atual", token, participantes, rodadas }).then((result) => {
+    cache.clear();
+    return result;
+  });
+}
+
 export function saveAdminTemporadaLegada(token, temporada, participantes, rodadas) {
   return post({ acao: "salvar_temporada_legada", token, temporada, participantes, rodadas }).then((result) => {
     cache.clear();

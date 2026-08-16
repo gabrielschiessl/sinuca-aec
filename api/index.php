@@ -101,6 +101,11 @@ try {
             (array) ($requestBody['participantes'] ?? []),
             (array) ($requestBody['rodadas'] ?? []),
         ),
+        'salvar_temporada_atual' => $admin->saveActiveSeason(
+            (string) ($requestBody['token'] ?? ''),
+            (array) ($requestBody['participantes'] ?? []),
+            (array) ($requestBody['rodadas'] ?? []),
+        ),
         'salvar_temporada_legada' => $admin->saveLegacySeason(
             (string) ($requestBody['token'] ?? ''),
             $requestBody['temporada'] ?? null,

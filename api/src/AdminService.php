@@ -477,6 +477,7 @@ final class AdminService
             WHERE year = :year
               AND (
                 status = 'PREPARACAO'
+                OR status = 'ATIVA'
                 OR (status = 'ARQUIVADA' AND origin = 'LEGADA')
               )
             LIMIT 1
@@ -511,7 +512,9 @@ final class AdminService
 
         return [
             'persistida' => true,
-            'modo' => strtoupper((string) $season['origin']) === 'LEGADA' ? 'LEGADA' : 'NOVA',
+            'modo' => strtoupper((string) $season['status']) === 'ATIVA'
+                ? 'ATUAL'
+                : (strtoupper((string) $season['origin']) === 'LEGADA' ? 'LEGADA' : 'NOVA'),
             'temporada' => (int) $season['year'],
             'versao' => (int) $season['version'],
             'status' => strtoupper((string) $season['status']),
@@ -583,6 +586,74 @@ final class AdminService
                     'tipo' => $current['origin'],
                 ] : null,
                 $after,
+            );
+            $this->bumpDataVersion();
+            $this->db->commit();
+            return ['sucesso' => true, ...$this->loadSeason($token, $year)];
+        } catch (\Throwable $error) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $error;
+        }
+    }
+
+    public function saveActiveSeason(
+        string $token,
+        array $informedParticipants,
+        array $informedRounds,
+    ): array {
+        $administrator = $this->auth->administrator($token);
+        $year = $this->public->currentSeason();
+        $participants = $this->validateNewSeasonParticipants($informedParticipants);
+        $rounds = $this->validateSeasonSchedule($informedRounds, $participants, true);
+
+        $this->db->beginTransaction();
+        try {
+            $seasonStatement = $this->db->prepare(<<<'SQL'
+                SELECT id, version, status, origin
+                FROM seasons
+                WHERE year = :year AND status = 'ATIVA'
+                LIMIT 1
+                FOR UPDATE
+            SQL);
+            $seasonStatement->execute(['year' => $year]);
+            $season = $seasonStatement->fetch();
+            if (!$season) {
+                throw new ApiException('Temporada atual não encontrada.', 404);
+            }
+            $seasonId = (int) $season['id'];
+            $storedParticipants = $this->seasonPlayerIdsByNumber($seasonId);
+            $storedRounds = $this->draftSchedule($seasonId);
+            $rounds = $this->preserveActiveSeasonResults(
+                $rounds,
+                $participants,
+                $storedRounds,
+                $storedParticipants,
+            );
+            $rounds = $this->applyDirectWoToSchedule($rounds, $participants);
+
+            $this->clearSeasonContent($seasonId);
+            $this->persistSeasonContent($seasonId, $participants, $rounds, true);
+            $this->syncActivePlayers($participants);
+            $this->db->prepare(
+                'UPDATE seasons SET updated_at = CURRENT_TIMESTAMP WHERE id = :id'
+            )->execute(['id' => $seasonId]);
+
+            $this->audit(
+                (int) $administrator['administrator_id'],
+                'salvar_temporada_atual',
+                'temporada',
+                (string) $seasonId,
+                ['temporada' => $year, 'status' => 'ATIVA'],
+                [
+                    'temporada' => $year,
+                    'status' => 'ATIVA',
+                    'participantes_a' => count($participants['A']),
+                    'participantes_b' => count($participants['B']),
+                    'rodadas_a' => count($rounds['A']),
+                    'rodadas_b' => count($rounds['B']),
+                ],
             );
             $this->bumpDataVersion();
             $this->db->commit();
@@ -2058,6 +2129,99 @@ final class AdminService
             $ordered[] = $round;
         }
         return $ordered;
+    }
+
+    private function seasonPlayerIdsByNumber(int $seasonId): array
+    {
+        $statement = $this->db->prepare(<<<'SQL'
+            SELECT division, number, player_id
+            FROM participants
+            WHERE season_id = :season_id
+        SQL);
+        $statement->execute(['season_id' => $seasonId]);
+        $result = ['A' => [], 'B' => []];
+        foreach ($statement->fetchAll() as $participant) {
+            $result[$participant['division']][(int) $participant['number']] =
+                (int) $participant['player_id'];
+        }
+        return $result;
+    }
+
+    private function preserveActiveSeasonResults(
+        array $rounds,
+        array $participants,
+        array $storedRounds,
+        array $storedParticipants,
+    ): array {
+        $newPlayers = ['A' => [], 'B' => []];
+        foreach (['A', 'B'] as $division) {
+            foreach ($participants[$division] as $participant) {
+                $newPlayers[$division][(int) $participant['numero']] =
+                    (int) $participant['jogador_id'];
+            }
+        }
+
+        $storedMatches = ['A' => [], 'B' => []];
+        foreach (['A', 'B'] as $division) {
+            foreach ($storedRounds[$division] as $round) {
+                foreach ($round['partidas'] as $match) {
+                    $number1 = (int) $match['numero1'];
+                    $number2 = (int) $match['numero2'];
+                    $key = min($number1, $number2) . '-' . max($number1, $number2);
+                    $storedMatches[$division][$key] = $match;
+                }
+            }
+        }
+
+        foreach (['A', 'B'] as $division) {
+            foreach ($rounds[$division] as &$round) {
+                foreach ($round['partidas'] as &$match) {
+                    $number1 = (int) $match['numero1'];
+                    $number2 = (int) $match['numero2'];
+                    $samePlayers = isset(
+                        $storedParticipants[$division][$number1],
+                        $storedParticipants[$division][$number2],
+                        $newPlayers[$division][$number1],
+                        $newPlayers[$division][$number2],
+                    ) &&
+                        $storedParticipants[$division][$number1] === $newPlayers[$division][$number1] &&
+                        $storedParticipants[$division][$number2] === $newPlayers[$division][$number2];
+                    if (!$samePlayers) {
+                        continue;
+                    }
+                    $key = min($number1, $number2) . '-' . max($number1, $number2);
+                    $stored = $storedMatches[$division][$key] ?? null;
+                    if (!$stored) {
+                        continue;
+                    }
+                    $reversed = (int) $stored['numero1'] === $number2;
+                    $match['status'] = $stored['status'];
+                    $match['placar1'] = $reversed ? $stored['placar2'] : $stored['placar1'];
+                    $match['placar2'] = $reversed ? $stored['placar1'] : $stored['placar2'];
+                    $match['observacao'] = $stored['observacao'];
+                }
+                unset($match);
+            }
+            unset($round);
+        }
+        return $rounds;
+    }
+
+    private function syncActivePlayers(array $participants): void
+    {
+        $ids = array_map(
+            static fn (array $participant): int => (int) $participant['jogador_id'],
+            [...$participants['A'], ...$participants['B']],
+        );
+        $this->db->exec('UPDATE players SET active = 0');
+        if ($ids === []) {
+            return;
+        }
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $statement = $this->db->prepare(
+            "UPDATE players SET active = 1 WHERE id IN ({$placeholders})"
+        );
+        $statement->execute($ids);
     }
 
     private function draftSchedule(int $seasonId): array
