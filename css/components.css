@@ -1005,7 +1005,7 @@
 .ranking-table { width:100%; min-width:820px; border-collapse:collapse; }
 .ranking-table th,.ranking-table td { padding:13px 14px; border-bottom:1px solid var(--border); background:var(--group-bg); text-align:center; }
 .ranking-table th { color:var(--text-muted); background:var(--surface-darkest); font-size:.7rem; letter-spacing:.04em; text-transform:uppercase; }
-.ranking-sticky-header { position:fixed; z-index:90; display:none; overflow:hidden; box-sizing:border-box; border:1px solid var(--border); border-radius:0; box-shadow:var(--shadow); pointer-events:none; }
+.ranking-sticky-header { position:fixed; z-index:90; display:none; overflow:hidden; box-sizing:border-box; border:0; border-radius:0; box-shadow:var(--shadow); pointer-events:none; }
 .ranking-sticky-header.is-visible { display:block; }
 .ranking-sticky-header .ranking-table { table-layout:fixed; transform:translateX(0); }
 .ranking-sticky-header .ranking-table th { box-sizing:border-box; }
@@ -1307,6 +1307,12 @@
   .admin-round-date-controls .btn { width:100%; }
 }
 
+@media (max-width: 410px) {
+  .rules-tabs { gap:4px; }
+  .rules-tabs .tab-button { height:44px; padding:0 4px; gap:4px; font-size:13px; }
+  .rules-tabs .tab-button i { font-size:.9rem; }
+}
+
 .admin-footer {
   width: 100%;
   flex: 0 0 auto;
@@ -1318,6 +1324,7 @@
   .admin-management-tabs button { padding:5px 2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:.7rem; }
   .admin-player-search .admin-input { font-size:16px; }
   .admin-player-row .admin-input,.admin-player-row .admin-select { font-size:16px; }
+  .admin-participant-tiebreak .admin-input,.admin-season-tiebreak .admin-input { font-size:16px; }
   .admin-player-combobox-control input { font-size:16px; }
   .admin-season-match-schedule .admin-input { font-size:16px; }
   .admin-season-round-schedule .admin-input { font-size:16px; }

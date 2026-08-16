@@ -13,7 +13,7 @@ export function renderRegra() {
       { id: "regra", label: "Regra", icon: "bi bi-journal-text" },
       { id: "bolas", label: "Bolas", icon: "bi bi-circle-fill" },
       { id: "regulamento", label: "Regulamento", icon: "bi bi-clipboard-check" },
-    ])}
+    ], "rules-tabs")}
 
     <main class="rules-page">
       <section id="regra" class="rules-section">

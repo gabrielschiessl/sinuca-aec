@@ -1,7 +1,7 @@
-export function tabs(items) {
+export function tabs(items, className = "") {
   return `
 
-<nav class="tabs">
+<nav class="tabs${className ? ` ${className}` : ""}">
 
 
 ${items
