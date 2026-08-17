@@ -1996,6 +1996,10 @@ select.score-box {
   list-style-type: lower-alpha;
 }
 
+.rules-list .rules-commission-list {
+  list-style-type: decimal;
+}
+
 .rules-list ol ol {
   list-style-type: lower-roman;
 }

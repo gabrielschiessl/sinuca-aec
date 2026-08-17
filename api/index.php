@@ -14,6 +14,7 @@ require_once __DIR__ . '/src/Database.php';
 require_once __DIR__ . '/src/JsonResponse.php';
 require_once __DIR__ . '/src/GoogleTokenVerifier.php';
 require_once __DIR__ . '/src/AuthService.php';
+require_once __DIR__ . '/src/RegulationDocumentGenerator.php';
 require_once __DIR__ . '/src/AdminService.php';
 require_once __DIR__ . '/src/StatisticsCalculator.php';
 require_once __DIR__ . '/src/PublicService.php';
@@ -73,6 +74,10 @@ try {
             (string) ($requestBody['token'] ?? ''),
             $requestBody['temporada'] ?? null,
             (string) ($requestBody['divisao'] ?? 'A'),
+        ),
+        'admin_regulamento' => $admin->regulationDocument(
+            (string) ($requestBody['token'] ?? ''),
+            $requestBody['temporada'] ?? null,
         ),
         'salvar_taxa_inscricao' => $admin->saveRegistrationFee(
             (string) ($requestBody['token'] ?? ''),

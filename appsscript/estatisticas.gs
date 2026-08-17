@@ -22,8 +22,13 @@ function getEstatisticas(serie, temporadaInformada) {
 function getTemporadasPublicas() {
   garantirEstruturaTemporadas();
   const temporadaAtual = getTemporadaAtual();
+  const taxa = getSheetAsObjects(SHEETS.configuracao).find(
+    (item) => String(item.chave).trim() === `taxa_inscricao_${temporadaAtual}`,
+  );
   return {
     temporada_atual: temporadaAtual,
+    taxa_inscricao:
+      taxa && String(taxa.valor).trim() !== "" ? Number(taxa.valor) : null,
     temporadas: getSheetAsObjects(SHEETS.temporadas)
       .filter((item) => {
         const status = String(item.status).trim().toUpperCase();

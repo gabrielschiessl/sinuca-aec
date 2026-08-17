@@ -368,6 +368,57 @@ final class AdminService
         ];
     }
 
+    public function regulationDocument(string $token, mixed $informedYear): array
+    {
+        $this->auth->administrator($token);
+        $year = filter_var($informedYear, FILTER_VALIDATE_INT);
+        if (!$year) {
+            throw new ApiException('Temporada inválida.');
+        }
+        $seasonStatement = $this->db->prepare('SELECT id FROM seasons WHERE year = :year LIMIT 1');
+        $seasonStatement->execute(['year' => $year]);
+        $seasonId = $seasonStatement->fetchColumn();
+        if ($seasonId === false) {
+            throw new ApiException('Temporada não encontrada.', 404);
+        }
+
+        $feeStatement = $this->db->prepare(
+            'SELECT setting_value FROM settings WHERE setting_key = :setting_key'
+        );
+        $feeStatement->execute(['setting_key' => 'taxa_inscricao_' . $year]);
+        $fee = $feeStatement->fetchColumn();
+        if ($fee === false || $fee === '' || !is_numeric($fee)) {
+            throw new ApiException("Informe a taxa de inscrição de {$year} antes de gerar o regulamento.");
+        }
+
+        $dateStatement = $this->db->prepare(<<<'SQL'
+            SELECT MIN(scheduled_date) AS start_date, MAX(scheduled_date) AS end_date
+            FROM rounds
+            WHERE season_id = :season_id AND division IN ('A', 'B') AND scheduled_date IS NOT NULL
+        SQL);
+        $dateStatement->execute(['season_id' => $seasonId]);
+        $dates = $dateStatement->fetch();
+        if (!$dates || !$dates['start_date'] || !$dates['end_date']) {
+            throw new ApiException("Cadastre as datas das rodadas de {$year} antes de gerar o regulamento.");
+        }
+
+        $generator = new RegulationDocumentGenerator(
+            dirname(__DIR__) . '/templates/regulamento-aec.docx'
+        );
+        $content = $generator->generate(
+            (int) $year,
+            (float) $fee,
+            date('d/m/Y', strtotime((string) $dates['start_date'])),
+            date('d/m/Y', strtotime((string) $dates['end_date'])),
+        );
+
+        return [
+            'nome_arquivo' => "AEC-Sinuca-Regulamento-{$year}.docx",
+            'mime_type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'conteudo_base64' => base64_encode($content),
+        ];
+    }
+
     public function prepareSeason(string $token, mixed $informedYear): array
     {
         $this->auth->administrator($token);

@@ -1,6 +1,7 @@
 import { renderNavbar } from "../components/navbar.js";
 import { renderFooter } from "../components/footer.js";
 import { tabs } from "../components/tabs.js";
+import { getTemporadas } from "../api.js";
 import { withBasePath } from "../config.js";
 import { resetPageScroll } from "../utils/pageScroll.js";
 
@@ -128,7 +129,10 @@ async function loadRulesContent(elementId, path, contentName) {
     if (!response.ok) throw new Error(`${contentName} indisponível.`);
 
     const html = await response.text();
-    if (content.isConnected) content.innerHTML = html;
+    if (content.isConnected) {
+      content.innerHTML = html;
+      if (contentName === "regulamento") hydrateCurrentRegistrationFee(content);
+    }
   } catch (error) {
     if (!content.isConnected) return;
 
@@ -138,6 +142,67 @@ async function loadRulesContent(elementId, path, contentName) {
         <p>Não foi possível carregar o ${contentName}.</p>
       </div>`;
   }
+}
+
+async function hydrateCurrentRegistrationFee(content) {
+  try {
+    const data = await getTemporadas();
+    if (data.taxa_inscricao === null || data.taxa_inscricao === undefined || data.taxa_inscricao === "") return;
+    const fee = Number(data.taxa_inscricao);
+    if (!Number.isFinite(fee) || fee < 0 || !content.isConnected) return;
+    const formatted = fee.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+      minimumFractionDigits: 2,
+    });
+    content.querySelectorAll("[data-current-registration-fee]")
+      .forEach((element) => (element.textContent = formatted));
+    content.querySelectorAll("[data-current-registration-fee-words]")
+      .forEach((element) => (element.textContent = currencyInPortuguese(fee)));
+    content.querySelectorAll("[data-current-registration-fee-details]")
+      .forEach((element) => (element.hidden = false));
+  } catch (error) {
+    // Mantém o valor de referência do documento se a configuração estiver indisponível.
+  }
+}
+
+function currencyInPortuguese(value) {
+  const totalCents = Math.round(value * 100);
+  const reais = Math.floor(totalCents / 100);
+  const centavos = totalCents % 100;
+  const parts = [
+    `${numberInPortuguese(reais)} ${reais === 1 ? "real" : "reais"}`,
+  ];
+  if (centavos) {
+    parts.push(`${numberInPortuguese(centavos)} ${centavos === 1 ? "centavo" : "centavos"}`);
+  }
+  return parts.join(" e ");
+}
+
+function numberInPortuguese(value) {
+  const units = ["zero", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove"];
+  const teens = ["dez", "onze", "doze", "treze", "quatorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove"];
+  const tens = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
+  const hundreds = ["", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"];
+  const number = Math.max(0, Math.trunc(value));
+  if (number < 10) return units[number];
+  if (number < 20) return teens[number - 10];
+  if (number < 100) {
+    const remainder = number % 10;
+    return tens[Math.floor(number / 10)] + (remainder ? ` e ${units[remainder]}` : "");
+  }
+  if (number === 100) return "cem";
+  if (number < 1000) {
+    const remainder = number % 100;
+    return hundreds[Math.floor(number / 100)] + (remainder ? ` e ${numberInPortuguese(remainder)}` : "");
+  }
+  if (number < 1000000) {
+    const thousands = Math.floor(number / 1000);
+    const remainder = number % 1000;
+    const prefix = thousands === 1 ? "mil" : `${numberInPortuguese(thousands)} mil`;
+    return prefix + (remainder ? ` e ${numberInPortuguese(remainder)}` : "");
+  }
+  return number.toLocaleString("pt-BR");
 }
 
 function renderBola(arquivo, valor, nome) {

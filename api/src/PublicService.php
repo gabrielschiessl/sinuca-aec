@@ -19,9 +19,16 @@ final class PublicService
             "SELECT year FROM seasons WHERE status IN ('ATIVA', 'ARQUIVADA') ORDER BY year DESC"
         )->fetchAll(PDO::FETCH_COLUMN);
 
+        $feeStatement = $this->db->prepare(
+            'SELECT setting_value FROM settings WHERE setting_key = :setting_key'
+        );
+        $feeStatement->execute(['setting_key' => 'taxa_inscricao_' . $current]);
+        $fee = $feeStatement->fetchColumn();
+
         return [
             'temporada_atual' => $current,
             'temporadas' => array_map('intval', $years),
+            'taxa_inscricao' => $fee === false || $fee === '' ? null : (float) $fee,
         ];
     }
 

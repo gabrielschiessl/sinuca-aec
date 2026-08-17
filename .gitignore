@@ -1,10 +1,17 @@
+# Configuração local e dados sensíveis
 api/config.local.php
 api/.env
+
+# Bancos, backups e arquivos gerados localmente
 database/dumps/
 database/backups/
 database/*snapshot*.json
 database/import_generated.sql
-.vscode/settings.json
-.tmp
-outputs
 
+# Configuração pessoal do editor
+.vscode/settings.json
+
+# Artefatos temporários de desenvolvimento e validação
+/.tmp/
+/tmp/
+/outputs/

@@ -13,6 +13,7 @@ import {
   getAdminTemporada,
   getAdminTemporadas,
   getAdminDadosPlanilha,
+  getAdminRegulamento,
   prepareAdminTemporada,
   prepareAdminTemporadaLegada,
   publishAdminTemporadaLegada,
@@ -370,10 +371,10 @@ function renderDashboard(session) {
           ${spreadsheetGroup("cadastros", "Cadastros", "bi-person-vcard-fill", [["jogadores", "Jogadores"], ["inscricao", "Ficha de inscrição"]])}
           ${spreadsheetGroup("estatisticas", "Estatísticas", "bi-bar-chart-fill", [["classificacao-simples", "Classificação simples", "updated-only"], ["classificacao", "Classificação", "updated-only"], ["vitorias", "Vitórias"], ["resultados", "Resultados", "updated-only"], ["partidas", "Partidas vencidas"], ["ranking", "Ranking", "updated-series-a-only"]])}
           ${spreadsheetGroup("jogos", "Jogos", "bi-calendar3", [["rodadas", "Rodadas (todas as folhas)"], ["individuais", "Fichas individuais"]])}
-          <details class="admin-spreadsheet-group" data-spreadsheet-final-group hidden><summary><span><i class="bi bi-trophy-fill"></i> Documentos finais</span><i class="bi bi-chevron-down"></i></summary><div></div></details>
+          ${spreadsheetGroup("finais", "Documentos finais", "bi-file-earmark-text-fill", [["regulamento", "Regulamento (.docx)"]])}
         </div>
         <div class="admin-season-actions">
-          <button class="btn" type="button" data-generate-spreadsheet><i class="bi bi-file-earmark-spreadsheet"></i> Gerar planilha</button>
+          <button class="btn" type="button" data-generate-spreadsheet><i class="bi bi-download"></i> Baixar arquivos</button>
         </div>
       </section>
 
@@ -644,28 +645,52 @@ async function generateSpreadsheet(event) {
   const season = selectedSpreadsheetSeason();
   const division = page?.querySelector("[data-spreadsheet-division]")?.value;
   const version = page?.querySelector("[data-spreadsheet-version]")?.value;
-  const sheets = [...(page?.querySelectorAll("[data-spreadsheet-sheet]:checked:not(:disabled)") || [])].map((checkbox) => checkbox.value);
-  if (!season || !division || !sheets.length) {
-    showAdminModal("Selecione as folhas", "Escolha ao menos uma folha para gerar a planilha.", "error");
+  const selections = [...(page?.querySelectorAll("[data-spreadsheet-sheet]:checked:not(:disabled)") || [])].map((checkbox) => checkbox.value);
+  const includeRegulation = selections.includes("regulamento");
+  const sheets = selections.filter((selection) => selection !== "regulamento");
+  if (!season || !division || !selections.length) {
+    showAdminModal("Selecione os arquivos", "Escolha ao menos uma folha ou documento para baixar.", "error");
     return;
   }
   const button = event.currentTarget;
   button.disabled = true;
-  button.innerHTML = '<span class="loading-spinner-inline"></span> Gerando planilha';
+  button.innerHTML = '<span class="loading-spinner-inline"></span> Preparando arquivos';
   try {
-    const data = await getAdminDadosPlanilha(activeAdminSession.token, season.temporada, division);
-    await exportChampionshipSpreadsheet(data, { version, sheets });
+    if (sheets.length) {
+      const data = await getAdminDadosPlanilha(activeAdminSession.token, season.temporada, division);
+      await exportChampionshipSpreadsheet(data, { version, sheets });
+    }
+    if (includeRegulation) {
+      const regulation = await getAdminRegulamento(activeAdminSession.token, season.temporada);
+      downloadBase64File(regulation);
+    }
     showAdminModal(
-      "Planilha gerada",
-      `O arquivo da Série ${division} de ${season.temporada} foi preparado para download.`,
+      "Arquivos preparados",
+      `Os downloads selecionados de ${season.temporada} foram iniciados.`,
       "success",
     );
   } catch (error) {
     showAdminModal("Não foi possível gerar", error.message, "error");
   } finally {
     button.disabled = false;
-    button.innerHTML = '<i class="bi bi-file-earmark-spreadsheet"></i> Gerar planilha';
+    button.innerHTML = '<i class="bi bi-download"></i> Baixar arquivos';
   }
+}
+
+function downloadBase64File(file) {
+  const binary = window.atob(file.conteudo_base64 || "");
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  const url = URL.createObjectURL(new Blob([bytes], { type: file.mime_type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = file.nome_arquivo || "Regulamento.docx";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 async function loadAdminSeasons() {

@@ -153,6 +153,10 @@ export function getAdminDadosPlanilha(token, temporada, divisao) {
   return post({ acao: "admin_dados_planilha", token, temporada, divisao });
 }
 
+export function getAdminRegulamento(token, temporada) {
+  return post({ acao: "admin_regulamento", token, temporada });
+}
+
 export function saveAdminTaxaInscricao(token, temporada, taxa) {
   return post({ acao: "salvar_taxa_inscricao", token, temporada, taxa }).then((result) => {
     cache.clear();
