@@ -50,7 +50,7 @@ try {
         'status' => [
             'status' => 'online',
             'sistema' => 'Projeto AEC Sinuca',
-            'versao' => '2.0.0',
+            'versao' => '2.1.0',
             'banco' => 'mysql',
         ],
         'temporadas' => $service->seasons(),
@@ -118,6 +118,10 @@ try {
             (array) ($requestBody['rodadas'] ?? []),
         ),
         'publicar_temporada_legada' => $admin->publishLegacySeason(
+            (string) ($requestBody['token'] ?? ''),
+            $requestBody['temporada'] ?? null,
+        ),
+        'ativar_temporada' => $admin->activateSeason(
             (string) ($requestBody['token'] ?? ''),
             $requestBody['temporada'] ?? null,
         ),

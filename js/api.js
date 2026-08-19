@@ -1,6 +1,5 @@
 const APPS_SCRIPT_QAS_API_URL =
   "https://script.google.com/macros/s/AKfycbzQEJ5hbg5DjhhYRmakCJuC3DO16uwYP6lP0D5zYhKbuAIe4471Zfs6DiytrL2looie/exec";
-  // "https://script.google.com/macros/s/AKfycbwrXgGHzNFPg8dkRSohBQ_zzuY_fm1PAjChEWtQZLcvTGjHg2fdEljBNaO_a746Df4i/exec";
 const MYSQL_API_URL = new URL("../api/", import.meta.url).href;
 const requestedApi = new URLSearchParams(window.location.search)
   .get("api")
@@ -12,7 +11,6 @@ const API_BACKEND = ["appscript", "apps-script"].includes(requestedApi)
 const API_URL = API_BACKEND === "appscript"
   ? APPS_SCRIPT_QAS_API_URL
   : MYSQL_API_URL;
-
 
 const CACHE_TTL = 60_000;
 const cache = new Map();
@@ -240,13 +238,6 @@ export function deleteAdminTemporada(token, temporada) {
 
 export function activateAdminTemporada(token, temporada) {
   return post({ acao: "ativar_temporada", token, temporada }).then((result) => {
-    cache.clear();
-    return result;
-  });
-}
-
-export function saveAdminPartida(token, partida) {
-  return post({ acao: "salvar_partida", token, ...partida }).then((result) => {
     cache.clear();
     return result;
   });

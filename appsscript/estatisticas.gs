@@ -109,6 +109,7 @@ function calcularEstatisticasSerie({
       vitorias: 0,
       partidas_vencidas: 0,
       resultados: [],
+      wo_direto: normalizarBooleanoApi(participante.wo_direto),
     };
   });
 

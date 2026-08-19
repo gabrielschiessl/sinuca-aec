@@ -1,37 +1,30 @@
-# Configuração do login Google
+# Login administrativo com Google
 
 ## Google Cloud Console
 
-No cliente OAuth do tipo **Aplicativo da Web**, use:
+No cliente OAuth do tipo **Aplicativo da Web**, cadastre as origens usadas pelo
+projeto:
 
-- Origem JavaScript: `http://localhost:5500`
-- Origem JavaScript: `http://127.0.0.1:5500`
-- Origem JavaScript: `https://gabrielschiessl.github.io`
-- Origem JavaScript: `https://netzup.com.br`
+- `http://localhost:5500`
+- `http://127.0.0.1:5500`
+- `https://netzup.com.br`
 
-O Google Identity Services usado pelo projeto não exige URI de redirecionamento.
+O Google Identity Services usado pelo sistema não exige URI de redirecionamento.
+Enquanto a tela de consentimento estiver em teste, inclua as contas
+administrativas como usuários de teste.
 
-Enquanto a tela de consentimento estiver no modo de teste, adicione como usuários de teste as mesmas contas que terão acesso administrativo.
+## API MySQL (produção)
 
-## Propriedades do Apps Script
+Configure em `api/config.local.php`:
 
-Em **Configurações do projeto > Propriedades do script**, crie:
+- `google_client_id`: o mesmo cliente configurado em `js/config.js`;
+- `admin_emails`: lista das contas autorizadas;
+- `session_duration_seconds`: validade da sessão administrativa.
 
-- Propriedade: `ADMIN_EMAILS`
-- Valor: lista de e-mails autorizados separados por vírgula
+O arquivo local não deve ser enviado ao Git.
 
-Os e-mails não devem ser incluídos em arquivos públicos do repositório.
+## Apps Script (QAS opcional)
 
-## Publicação do Apps Script
-
-1. Sincronize os arquivos da pasta `appsscript` com o projeto Apps Script.
-2. Crie uma nova versão da implantação do tipo **App da Web**.
-3. Execute como o proprietário do projeto.
-4. Permita acesso a qualquer pessoa, pois a autorização administrativa é validada pelo token Google e pela lista privada no servidor.
-5. Preserve a URL da implantação usada em `js/api.js` ou atualize-a se o Google gerar outra URL.
-
-Na primeira execução, o Apps Script pedirá autorização para consultar a validação de tokens do Google.
-
-## Sessão
-
-A API retorna um token de sessão opaco, salvo no `localStorage` do dispositivo por até 30 dias. A senha e o token de identidade Google não são persistidos pelo site.
+O backend alternativo é selecionado acrescentando `?api=appscript` à URL. Nele,
+configure a propriedade de script `ADMIN_EMAILS`, publique como aplicativo da
+Web executado pelo proprietário e mantenha sua URL em `js/api.js`.

@@ -15,10 +15,14 @@ function getTemporadasAdmin() {
   const registros = getSheetAsObjects(SHEETS.temporadas);
   const participantes = getSheetAsObjects(SHEETS.temporadasParticipantes);
   const participantesAtuais = getSheetAsObjects(SHEETS.participantes);
+  const referenciaTexto = obterConfiguracaoApi("ranking_reference_year");
+  const referenciaRanking = /^\d{4}$/.test(referenciaTexto) ? Number(referenciaTexto) : null;
 
   return {
     temporada_atual: temporadaAtual,
     ano_minimo: new Date().getFullYear(),
+    referencia_ranking: referenciaRanking,
+    referencia_ranking_efetiva: referenciaRanking ?? temporadaAtual - 1,
     temporadas: registros
       .map((registro) => {
         const temporada = Number(registro.temporada);
@@ -42,6 +46,7 @@ function getTemporadasAdmin() {
           atualizado_em: registro.atualizado_em,
           participantes_a: vinculados.filter((item) => String(item.divisao).trim().toUpperCase() === "A").length,
           participantes_b: vinculados.filter((item) => String(item.divisao).trim().toUpperCase() === "B").length,
+          taxa_inscricao: obterTaxaInscricaoApi(temporada),
         };
       })
       .sort((a, b) => b.temporada - a.temporada || b.versao - a.versao),
@@ -106,6 +111,11 @@ function salvarTemporadaLegada(dados) {
   const registro = getSheetAsObjects(SHEETS.temporadas).find(
     (item) => Number(item.temporada) === temporada,
   );
+  if (registro &&
+    String(registro.status).trim().toUpperCase() === TEMPORADA_STATUS.ARQUIVADA &&
+    normalizarTipoTemporada(registro.tipo) === "LEGADA") {
+    return salvarTemporadaLegadaArquivadaApi(dados, registro);
+  }
   if (registro && (
     String(registro.status).trim().toUpperCase() !== TEMPORADA_STATUS.PREPARACAO ||
     normalizarTipoTemporada(registro.tipo) !== "LEGADA"
@@ -143,6 +153,7 @@ function salvarTemporadaLegada(dados) {
       ["A", "B"].flatMap((divisao) => participantes[divisao].map((item, indiceParticipante) => ({
         temporada, versao, divisao, numero: indiceParticipante + 1,
         jogador_id: item.jogador_id, desempate: item.desempate || "",
+        wo_direto: item.wo_direto ? "S" : "N",
       }))),
     );
     adicionarObjetosAba(
@@ -168,7 +179,7 @@ function normalizarRascunhoTemporadaLegada(dados) {
   const participantes = validarParticipantesTemporadaLegada(dados.participantes);
   const rodadasValidadas = validarRodadasTemporadaLegada(dados.rodadas, participantes);
   const placaresPermitidos = new Set(["-", "0", "1", "2"]);
-  const rodadas = ["A", "B"].reduce((resultado, divisao) => {
+  const rodadasNormalizadas = ["A", "B"].reduce((resultado, divisao) => {
     resultado[divisao] = rodadasValidadas[divisao].map((rodada, indiceRodada) => ({
       ...rodada,
       partidas: rodada.partidas.map((partida, indicePartida) => {
@@ -189,7 +200,10 @@ function normalizarRascunhoTemporadaLegada(dados) {
     }));
     return resultado;
   }, {});
-  return { participantes, rodadas };
+  return {
+    participantes,
+    rodadas: aplicarWoDiretoConteudoApi(rodadasNormalizadas, participantes),
+  };
 }
 
 function validarConteudoTemporadaLegada(dados) {
@@ -232,6 +246,7 @@ function publicarTemporadaLegada(temporadaInformada) {
             numero: indice + 1,
             jogador_id: item.jogador_id,
             desempate: item.desempate || "",
+            wo_direto: item.wo_direto ? "S" : "N",
           })),
         ),
       );
@@ -334,11 +349,20 @@ function getTemporadaPreparacao(temporadaInformada) {
   garantirEstruturaTemporadas();
   const temporada = Number(temporadaInformada);
   const registro = getSheetAsObjects(SHEETS.temporadas).find(
-    (item) =>
-      Number(item.temporada) === temporada &&
-      String(item.status).trim().toUpperCase() === TEMPORADA_STATUS.PREPARACAO,
+    (item) => Number(item.temporada) === temporada,
   );
   if (!registro) throw new Error("Temporada em preparação não encontrada.");
+
+  const status = String(registro.status).trim().toUpperCase();
+  if (status === TEMPORADA_STATUS.ATIVA && temporada === getTemporadaAtual()) {
+    return getTemporadaAtualParaEdicaoApi();
+  }
+  if (status === TEMPORADA_STATUS.ARQUIVADA && normalizarTipoTemporada(registro.tipo) === "LEGADA") {
+    return getTemporadaArquivadaParaEdicaoApi(temporada, registro);
+  }
+  if (status !== TEMPORADA_STATUS.PREPARACAO) {
+    throw new Error("Temporada em preparação não encontrada.");
+  }
 
   const versao = Number(registro.versao) || 1;
   const modo = normalizarTipoTemporada(registro.tipo) === "LEGADA" ? "LEGADA" : "NOVA";
@@ -385,8 +409,8 @@ function salvarTemporadaPreparacao(dados) {
   garantirEstruturaTemporadas();
   const temporada = validarAnoNovaTemporada(dados.temporada);
   const participantes = validarParticipantesTemporada(dados.participantes);
-  const rodadas = validarRodadasTemporadaInformadas(
-    dados.rodadas,
+  const rodadas = aplicarWoDiretoConteudoApi(
+    validarRodadasTemporadaInformadas(dados.rodadas, participantes),
     participantes,
   );
   const lock = LockService.getScriptLock();
@@ -421,20 +445,19 @@ function salvarTemporadaPreparacao(dados) {
     }
 
     excluirLinhasPorTemporadaVersao(abaParticipantes, temporada, versao);
-    const linhas = ["A", "B"].flatMap((divisao) =>
-      participantes[divisao].map((participante, indiceParticipante) => [
-        temporada,
-        versao,
-        divisao,
-        indiceParticipante + 1,
-        participante.jogador_id,
-      ]),
+    adicionarObjetosAba(
+      abaParticipantes,
+      ["A", "B"].flatMap((divisao) => participantes[divisao]
+        .map((participante, indiceParticipante) => ({
+          temporada,
+          versao,
+          divisao,
+          numero: indiceParticipante + 1,
+          jogador_id: participante.jogador_id,
+          desempate: participante.desempate || "",
+          wo_direto: participante.wo_direto ? "S" : "N",
+        }))),
     );
-    if (linhas.length) {
-      abaParticipantes
-        .getRange(abaParticipantes.getLastRow() + 1, 1, linhas.length, 5)
-        .setValues(linhas);
-    }
 
     excluirLinhasPorTemporadaVersao(abaRodadas, temporada, versao);
     const linhasRodadas = ["A", "B"].flatMap((divisao) =>
@@ -449,10 +472,10 @@ function salvarTemporadaPreparacao(dados) {
           partida.numero2,
           partida.data || "",
           partida.hora || "",
-          "A",
-          "-",
-          "-",
-          "",
+          partida.status || "A",
+          partida.placar1 ?? "-",
+          partida.placar2 ?? "-",
+          partida.observacao || "",
           agora,
           rodada.folga || "",
         ]),
@@ -551,8 +574,11 @@ function ativarTemporadaPreparacao(temporadaInformada) {
       (Number(item.versao) || 1) === versao,
     )
     .map(normalizarRodadaTemporada);
-  const rodadas = validarRodadasTemporadaInformadas(
-    agruparChaveamentoTemporada(partidasPreparadas),
+  const rodadas = aplicarWoDiretoConteudoApi(
+    validarRodadasTemporadaInformadas(
+      agruparChaveamentoTemporada(partidasPreparadas),
+      participantes,
+    ),
     participantes,
   );
   validarAgendaPublicacaoTemporada(rodadas);
@@ -575,6 +601,8 @@ function ativarTemporadaPreparacao(temporadaInformada) {
           divisao,
           numero: indice + 1,
           jogador_id: participante.jogador_id,
+          desempate: participante.desempate || "",
+          wo_direto: participante.wo_direto ? "S" : "N",
         })),
       ),
     );
@@ -590,10 +618,10 @@ function ativarTemporadaPreparacao(temporadaInformada) {
             numero2: partida.numero2,
             data: formatarDataPublicadaTemporada(partida.data),
             hora: partida.hora,
-            status: "A",
-            placar1: "-",
-            placar2: "-",
-            observacao: "",
+            status: partida.status || "A",
+            placar1: partida.placar1 ?? "-",
+            placar2: partida.placar2 ?? "-",
+            observacao: partida.observacao || "",
             atualizado_em: agora,
           })),
         ),
@@ -760,12 +788,12 @@ function garantirEstruturaTemporadas() {
   obterOuCriarAba(
     planilha,
     SHEETS.temporadasParticipantes,
-    ["temporada", "versao", "divisao", "numero", "jogador_id", "desempate"],
+    ["temporada", "versao", "divisao", "numero", "jogador_id", "desempate", "wo_direto"],
   );
   obterOuCriarAba(
     planilha,
     SHEETS.participantes,
-    ["temporada", "divisao", "numero", "jogador_id", "desempate"],
+    ["temporada", "divisao", "numero", "jogador_id", "desempate", "wo_direto"],
   );
   obterOuCriarAba(
     planilha,
@@ -878,6 +906,7 @@ function normalizarParticipanteTemporada(item) {
     numero: Number(item.numero),
     jogador_id: Number(item.jogador_id),
     desempate: normalizarPrioridadeDesempate(item.desempate),
+    wo_direto: normalizarBooleanoApi(item.wo_direto),
   };
 }
 
@@ -900,6 +929,7 @@ function validarParticipantesTemporada(valor) {
     resultado[divisao] = lista.map((item) => ({
       jogador_id: Number(item.jogador_id),
       desempate: normalizarPrioridadeDesempate(item.desempate),
+      wo_direto: normalizarBooleanoApi(item.wo_direto),
     }));
     if (resultado[divisao].some((item) => !jogadoresExistentes.has(item.jogador_id))) {
       throw new Error(`A Série ${divisao} possui um jogador inválido.`);
@@ -929,6 +959,7 @@ function validarParticipantesTemporadaLegada(valor) {
     resultado[divisao] = lista.map((item) => ({
       jogador_id: Number(item.jogador_id),
       desempate: normalizarPrioridadeDesempate(item.desempate),
+      wo_direto: normalizarBooleanoApi(item.wo_direto),
     }));
     if (resultado[divisao].some((item) => !jogadoresExistentes.has(item.jogador_id))) {
       throw new Error(`A Série ${divisao} possui um jogador inválido.`);

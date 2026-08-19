@@ -41,6 +41,7 @@ function getParticipantesAdmin(divisaoInformada) {
       numero: Number(participante.numero),
       jogador_id: Number(participante.jogador_id),
       desempate: normalizarPrioridadeDesempate(participante.desempate),
+      wo_direto: normalizarBooleanoApi(participante.wo_direto),
       jogador: jogadoresPorId[Number(participante.jogador_id)] || null,
     }));
 
@@ -82,6 +83,7 @@ function salvarParticipantesAdmin(dados) {
       throw new Error("Um dos participantes informados é inválido ou está inativo.");
     }
     alteracao.desempate = normalizarPrioridadeDesempate(alteracao.desempate);
+    alteracao.wo_direto = normalizarBooleanoApi(alteracao.wo_direto);
   });
 
   const lock = LockService.getScriptLock();
@@ -109,6 +111,7 @@ function salvarParticipantesAdmin(dados) {
       numero: Number(linha[coluna("numero")]),
       jogador_id: Number(linha[coluna("jogador_id")]),
       desempate: normalizarPrioridadeDesempate(linha[coluna("desempate")]),
+      wo_direto: normalizarBooleanoApi(linha[coluna("wo_direto")]),
     }));
     const idsSubstituidos = new Set();
     alteracoes.forEach((alteracao) => {
@@ -119,6 +122,7 @@ function salvarParticipantesAdmin(dados) {
       idsSubstituidos.add(registro.jogador_id);
       registro.jogador_id = Number(alteracao.jogador_id);
       registro.desempate = alteracao.desempate;
+      registro.wo_direto = alteracao.wo_direto;
     });
 
     const idsDuplicados = estadoFinal.map((item) => item.jogador_id).filter((id, indice, lista) => id && lista.indexOf(id) !== indice);
@@ -128,14 +132,17 @@ function salvarParticipantesAdmin(dados) {
       const registro = porChave[`${divisao}-${Number(alteracao.numero)}`];
       aba.getRange(registro.indice, coluna("jogador_id") + 1).setValue(Number(alteracao.jogador_id));
       aba.getRange(registro.indice, coluna("desempate") + 1).setValue(alteracao.desempate || "");
+      aba.getRange(registro.indice, coluna("wo_direto") + 1).setValue(alteracao.wo_direto ? "S" : "N");
     });
+
+    delete CACHE[SHEETS.participantes];
+    aplicarWoDiretoPlanilha(divisao);
 
     const idsVinculados = new Set(estadoFinal.map((item) => item.jogador_id).filter(Boolean));
     atualizarAtividadeJogadoresParticipantes(
       [...new Set([...idsSubstituidos, ...alteracoes.map((item) => Number(item.jogador_id))])],
       idsVinculados,
     );
-    delete CACHE[SHEETS.participantes];
     delete CACHE[SHEETS.jogadores];
     return { sucesso: true, ...getParticipantesAdmin(divisao) };
   } finally {

@@ -840,6 +840,169 @@ final class AdminService
         }
     }
 
+    public function activateSeason(string $token, mixed $informedYear): array
+    {
+        $administrator = $this->auth->administrator($token);
+        $year = filter_var($informedYear, FILTER_VALIDATE_INT);
+        if (!$year) {
+            throw new ApiException('Temporada em preparação não encontrada.', 404);
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $settingStatement = $this->db->query(<<<'SQL'
+                SELECT setting_value
+                FROM settings
+                WHERE setting_key = 'temporada_atual'
+                FOR UPDATE
+            SQL);
+            $currentSetting = $settingStatement->fetchColumn();
+            if ($currentSetting !== false && ctype_digit((string) $currentSetting)) {
+                $currentYear = (int) $currentSetting;
+            } else {
+                $activeStatement = $this->db->query(<<<'SQL'
+                    SELECT year
+                    FROM seasons
+                    WHERE status = 'ATIVA'
+                    ORDER BY year DESC
+                    LIMIT 1
+                    FOR UPDATE
+                SQL);
+                $activeYear = $activeStatement->fetchColumn();
+                if ($activeYear === false) {
+                    throw new ApiException('Temporada atual não encontrada.', 404);
+                }
+                $currentYear = (int) $activeYear;
+            }
+            if ($year !== $currentYear + 1) {
+                throw new ApiException(
+                    "Somente a temporada " . ($currentYear + 1) . " pode substituir a temporada atual."
+                );
+            }
+            $seasonStatement = $this->db->prepare(<<<'SQL'
+                SELECT id, year, version, status, origin
+                FROM seasons
+                WHERE year IN (:current_year, :new_year)
+                ORDER BY year
+                FOR UPDATE
+            SQL);
+            $seasonStatement->execute([
+                'current_year' => $currentYear,
+                'new_year' => $year,
+            ]);
+            $seasons = [];
+            foreach ($seasonStatement->fetchAll() as $season) {
+                $seasons[(int) $season['year']] = $season;
+            }
+            $current = $seasons[$currentYear] ?? null;
+            $next = $seasons[$year] ?? null;
+            if (!$current || strtoupper((string) $current['status']) !== 'ATIVA') {
+                throw new ApiException('Temporada atual não encontrada.', 404);
+            }
+            if (!$next || strtoupper((string) $next['status']) !== 'PREPARACAO' ||
+                strtoupper((string) $next['origin']) !== 'CRIADA') {
+                throw new ApiException('Temporada em preparação não encontrada.', 404);
+            }
+
+            $participantStatement = $this->db->prepare(<<<'SQL'
+                SELECT division, number, player_id, tiebreak_priority, direct_wo
+                FROM participants
+                WHERE season_id = :season_id
+                ORDER BY division, number
+            SQL);
+            $participantStatement->execute(['season_id' => $next['id']]);
+            $participants = ['A' => [], 'B' => []];
+            foreach ($participantStatement->fetchAll() as $participant) {
+                $division = strtoupper((string) $participant['division']);
+                if (!isset($participants[$division])) {
+                    continue;
+                }
+                $participants[$division][] = [
+                    'numero' => (int) $participant['number'],
+                    'jogador_id' => (int) $participant['player_id'],
+                    'desempate' => $participant['tiebreak_priority'] === null
+                        ? null : (int) $participant['tiebreak_priority'],
+                    'wo_direto' => (bool) $participant['direct_wo'],
+                ];
+            }
+            if (count($participants['A']) !== 20) {
+                throw new ApiException('A Série A deve possuir exatamente 20 participantes.');
+            }
+            if (count($participants['B']) < 2) {
+                throw new ApiException('A Série B deve possuir pelo menos 2 participantes.');
+            }
+
+            $scheduleStatement = $this->db->prepare(<<<'SQL'
+                SELECT r.division, COUNT(DISTINCT r.id) AS total_rounds,
+                       COUNT(m.id) AS total_matches,
+                       SUM(CASE WHEN m.scheduled_date IS NULL OR m.scheduled_time IS NULL THEN 1 ELSE 0 END)
+                           AS incomplete_matches
+                FROM rounds r
+                LEFT JOIN matches m ON m.round_id = r.id
+                WHERE r.season_id = :season_id
+                GROUP BY r.division
+            SQL);
+            $scheduleStatement->execute(['season_id' => $next['id']]);
+            $schedule = [];
+            foreach ($scheduleStatement->fetchAll() as $division) {
+                $schedule[strtoupper((string) $division['division'])] = $division;
+            }
+            foreach (['A', 'B'] as $division) {
+                $totalParticipants = count($participants[$division]);
+                $expectedRounds = $totalParticipants % 2 === 0
+                    ? $totalParticipants - 1 : $totalParticipants;
+                $expectedMatches = intdiv($totalParticipants * ($totalParticipants - 1), 2);
+                if (!isset($schedule[$division]) ||
+                    (int) $schedule[$division]['total_rounds'] !== $expectedRounds ||
+                    (int) $schedule[$division]['total_matches'] !== $expectedMatches) {
+                    throw new ApiException("O chaveamento da Série {$division} não foi cadastrado.");
+                }
+                if ((int) $schedule[$division]['incomplete_matches'] > 0) {
+                    throw new ApiException(
+                        "Preencha a data e o horário de todas as partidas da Série {$division}."
+                    );
+                }
+            }
+
+            $archive = $this->db->prepare(<<<'SQL'
+                UPDATE seasons
+                SET status = 'ARQUIVADA', updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+            SQL);
+            $archive->execute(['id' => $current['id']]);
+            $activate = $this->db->prepare(<<<'SQL'
+                UPDATE seasons
+                SET status = 'ATIVA', updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+            SQL);
+            $activate->execute(['id' => $next['id']]);
+            $setting = $this->db->prepare(<<<'SQL'
+                INSERT INTO settings (setting_key, setting_value)
+                VALUES ('temporada_atual', :year)
+                ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
+            SQL);
+            $setting->execute(['year' => (string) $year]);
+            $this->syncActivePlayers($participants);
+
+            $this->audit(
+                (int) $administrator['administrator_id'],
+                'ativar_temporada',
+                'temporada',
+                (string) $next['id'],
+                ['temporada_atual' => $currentYear, 'nova_temporada' => $year, 'status' => 'PREPARACAO'],
+                ['temporada_atual' => $year, 'temporada_anterior' => $currentYear, 'status' => 'ATIVA'],
+            );
+            $this->bumpDataVersion();
+            $this->db->commit();
+            return ['sucesso' => true, 'temporada_atual' => $year];
+        } catch (\Throwable $error) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $error;
+        }
+    }
+
     public function deleteSeason(string $token, mixed $informedYear): array
     {
         $administrator = $this->auth->administrator($token);

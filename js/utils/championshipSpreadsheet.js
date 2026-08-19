@@ -88,30 +88,10 @@ function baseSheet(context, name, orientation = "landscape") {
   return sheet;
 }
 
-function addHeader(context, sheet, title, endColumn) {
-  const end = columnLetter(endColumn);
-  sheet.mergeCells(`A1:${end}2`);
-  const cell = sheet.getCell("A1");
-  cell.value = title;
-  cell.font = { bold: true, size: 16, color: { argb: COLORS.wine } };
-  cell.alignment = { horizontal: "center", vertical: "middle" };
-  sheet.addImage(context.logos.aec, { tl: { col: 0, row: 0 }, ext: { width: 90, height: 39 } });
-  sheet.addImage(context.logos.snooker, { tl: { col: Math.max(1, endColumn - 2), row: 0 }, ext: { width: 100, height: 35 } });
-  sheet.getRow(1).height = 30;
-  sheet.getRow(2).height = 30;
-}
-
 function eachCell(sheet, startRow, startCol, endRow, endCol, callback) {
   for (let row = startRow; row <= endRow; row++) {
     for (let col = startCol; col <= endCol; col++) callback(sheet.getCell(row, col));
   }
-}
-
-function styleTable(sheet, startRow, startCol, endRow, endCol) {
-  eachCell(sheet, startRow, startCol, endRow, endCol, (cell) => {
-    cell.border = { top: border, left: border, right: border, bottom: border };
-    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-  });
 }
 
 function addPlayersSheet(context) {

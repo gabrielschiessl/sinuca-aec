@@ -26,6 +26,9 @@ function doGet(e) {
     case "temporadas":
       return responder(getTemporadasPublicas());
 
+    case "ranking":
+      return responder(getRankingPublico());
+
     default:
       return responder({
         erro: "Ação inválida.",
@@ -61,6 +64,22 @@ function doPost(e) {
         validarSessaoAdmin(dados.token);
         return responder(getTemporadasAdmin());
 
+      case "admin_dados_planilha":
+        validarSessaoAdmin(dados.token);
+        return responder(getDadosPlanilhaAdmin(dados.temporada, dados.divisao));
+
+      case "admin_regulamento":
+        validarSessaoAdmin(dados.token);
+        return responder(getRegulamentoAdmin(dados.temporada));
+
+      case "salvar_taxa_inscricao":
+        validarSessaoAdmin(dados.token);
+        return responder(salvarTaxaInscricaoAdmin(dados.temporada, dados.taxa));
+
+      case "salvar_referencia_ranking":
+        validarSessaoAdmin(dados.token);
+        return responder(salvarReferenciaRankingAdmin(dados.temporada));
+
       case "preparar_temporada":
         validarSessaoAdmin(dados.token);
         return responder(prepararNovaTemporada(dados.temporada));
@@ -84,6 +103,10 @@ function doPost(e) {
       case "salvar_temporada":
         validarSessaoAdmin(dados.token);
         return responder(salvarTemporadaPreparacao(dados));
+
+      case "salvar_temporada_atual":
+        validarSessaoAdmin(dados.token);
+        return responder(salvarTemporadaAtualAdmin(dados));
 
       case "salvar_temporada_legada":
         validarSessaoAdmin(dados.token);
