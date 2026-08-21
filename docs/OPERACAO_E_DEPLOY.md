@@ -55,14 +55,16 @@ Nunca versionar ou enviar credenciais em capturas, logs ou respostas de IA.
 2. Conferir `git status` e o diff.
 3. Aplicar migração necessária primeiro em QAS.
 4. Enviar os arquivos alterados preservando a estrutura de `/sinuca-aec`.
-5. Enviar modelos binários novos/alterados.
-6. Não enviar `.git`, `.vscode`, `config.local.php` local, dumps ou temporários.
-7. Confirmar `/api/?acao=status`.
-8. Abrir Home, Série A, Série B, Regra, Histórico, Ranking e Administrador.
-9. Fazer login, mas começar com testes somente leitura.
-10. Testar a mutação em escopo controlado e conferir diretamente no MySQL.
-11. Validar em desktop e Safari/iPhone.
-12. Se houver cache visual antigo, confirmar os headers antes de culpar o banco.
+5. Em alterações da PWA, enviar também `manifest.webmanifest`,
+   `service-worker.js` e todos os arquivos de `assets/icons/`.
+6. Enviar modelos binários novos/alterados.
+7. Não enviar `.git`, `.vscode`, `config.local.php` local, dumps ou temporários.
+8. Confirmar `/api/?acao=status`.
+9. Abrir Home, Série A, Série B, Regra, Histórico, Ranking e Administrador.
+10. Fazer login, mas começar com testes somente leitura.
+11. Testar a mutação em escopo controlado e conferir diretamente no MySQL.
+12. Validar em desktop e Safari/iPhone.
+13. Se houver cache visual antigo, confirmar os headers antes de culpar o banco.
 
 ## Backup e restauração
 
@@ -102,6 +104,23 @@ Ao atualizar QAS:
 `.htaccess` força `no-cache` para HTML, CSS, JS e MJS. Assets pesados têm cache
 de 30 dias. Ao substituir uma imagem mantendo o mesmo nome, o navegador pode
 preservá-la; prefira nome versionado ou ajuste controlado de cache.
+
+O service worker da PWA usa rede primeiro e não controla `api/`. Ao publicar
+uma alteração nele, recarregue o site e confirme em DevTools > Application que
+o novo worker assumiu o controle. Se o nome do cache for alterado, a ativação
+remove automaticamente caches antigos com prefixo `aec-sinuca-`.
+
+## Instalação da PWA
+
+- Android/Chrome: depois de atender aos critérios do navegador, a opção nativa
+  “Instalar app” aparece no menu ou na interface do navegador.
+- iPhone/iPad: usar o menu de compartilhamento e “Adicionar à Tela de Início”.
+- Desktop compatível: usar o ícone/opção de instalação do navegador.
+
+Não existe modal ou botão de instalação no frontend. Para trocar a identidade
+visual, substituir mantendo nome e dimensão: `pwa-192.png`, `pwa-512.png`,
+`pwa-maskable-192.png`, `pwa-maskable-512.png` e `apple-touch-icon.png`. Os
+ícones maskable devem manter a arte principal dentro da área segura central.
 
 ## Diagnóstico rápido
 

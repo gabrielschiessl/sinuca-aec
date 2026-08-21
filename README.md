@@ -16,6 +16,8 @@ Comece por [`docs/CONTEXTO_IA.md`](docs/CONTEXTO_IA.md).
 - `appsscript/` mantém o backend alternativo de QAS, acessível com `?api=appscript`.
 - `assets/templates/modelo-temporada-historica.xlsx` é o modelo de importação.
 - `api/templates/regulamento-aec.docx` é o modelo usado para gerar o regulamento parametrizado.
+- `manifest.webmanifest`, `service-worker.js` e `assets/icons/` tornam o site
+  instalável como PWA sem adicionar avisos próprios à interface.
 
 ## Configuração da API
 
@@ -41,3 +43,4 @@ Drive por `REGULATION_TEMPLATE_FILE_ID`.
 Envie o conteúdo do repositório para `/sinuca-aec` no servidor, preservando os
 arquivos `.htaccess` e `api/templates/regulamento-aec.docx`. A pasta `.git` e os
 diretórios locais `.tmp/`, `tmp/` e `outputs/` não devem ser publicados.
+Para a instalação PWA, envie também o manifesto, o service worker e os ícones.

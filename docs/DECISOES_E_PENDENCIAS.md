@@ -62,6 +62,13 @@ O Apps Script passou a expor todas as ações usadas pelo frontend, inclusive
 ranking, configurações, edição vigente, dados de planilha e DOCX. MySQL mantém a
 garantia ACID; Sheets mantém `ScriptLock` e coordenação multiaba.
 
+### 2026-08-21 — Site instalável como PWA sem promoção própria
+
+O site passou a fornecer manifesto, ícones e service worker para instalação em
+navegadores compatíveis. Não há botão ou modal de instalação no frontend: a
+promoção fica a cargo do navegador. O service worker adota rede primeiro e não
+intercepta a API, preservando atualizações frequentes e dados administrativos.
+
 ## Pendências prioritárias
 
 ### P1 — Testes automatizados

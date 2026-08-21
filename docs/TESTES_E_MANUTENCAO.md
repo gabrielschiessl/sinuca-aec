@@ -60,6 +60,7 @@ caso declarar a limitação e validar em QAS/servidor antes de produção.
 | Nova temporada | sugestão, importação parcial, ímpar, rascunho, ativação |
 | Histórica | A somente, A+B, Wx0, WxW, edição após publicação |
 | Planilhas | cada grupo, manual/atualizada, A/B, DOCX simultâneo |
+| PWA | manifesto, SW ativo, instalação Android, adicionar à Home no iPhone |
 
 ### Regressão específica da ativação
 
@@ -89,6 +90,18 @@ Validar no mínimo:
 - campos `date`, `time`, `number`, selects e modais nativos do iOS.
 
 Inputs focáveis no iOS devem ter fonte de pelo menos 16 px para evitar zoom.
+
+### Regressão específica da PWA
+
+1. Abrir `/sinuca-aec/manifest.webmanifest` e confirmar JSON, ícones e escopo.
+2. Confirmar que todos os cinco PNGs de `assets/icons/` respondem com 200.
+3. Em DevTools > Application, confirmar manifesto válido e service worker ativo.
+4. Navegar online pelas rotas e confirmar ausência de respostas antigas.
+5. Confirmar no Network que `/api/` continua vindo da rede e não do SW.
+6. Simular offline e confirmar que o casco da Home abre, aceitando que dados da
+   API, login e bibliotecas CDN não possuem garantia offline.
+7. Instalar no Android/desktop e confirmar modo standalone e ícone.
+8. Adicionar à Tela de Início no Safari/iPhone e confirmar ícone e abertura.
 
 ## Teste seguro de escrita
 

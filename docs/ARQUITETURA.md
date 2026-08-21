@@ -29,12 +29,14 @@ Não há framework, bundler ou gerenciador de pacotes. `index.html` carrega
 - `js/api.js`: seleção do backend, cache e contrato HTTP.
 - `js/auth.js`: persistência e restauração da sessão administrativa.
 - `css/`: tokens, layout, componentes e página inicial.
+- `manifest.webmanifest`: metadados de instalação da PWA.
+- `service-worker.js`: instalação, atualização e fallback do casco estático.
 
 ## Mapa do repositório
 
 ```text
 /
-├── index.html, 404.html, .htaccess
+├── index.html, 404.html, .htaccess, manifest.webmanifest, service-worker.js
 ├── administrador/, serie-a/, serie-b/, regra/, historico/, ranking/
 │   └── index.html              # entradas das rotas amigáveis
 ├── js/
@@ -133,6 +135,21 @@ ACID; Sheets usa bloqueio de script e operações coordenadas entre abas.
 - Imagens/fontes: cache de 30 dias.
 - Dados GET do frontend: `Map` em memória com TTL de 60 segundos.
 - Toda mutação via funções públicas de `js/api.js` limpa o cache em memória.
+- PWA: o service worker usa rede primeiro para recursos da mesma origem e só
+  recorre ao cache estático quando a rede falha. Requisições em `api/`, métodos
+  diferentes de GET e origens externas não são interceptados.
+
+## PWA instalável
+
+O frontend é instalável como Progressive Web App. O manifesto usa caminhos
+relativos para funcionar tanto em localhost quanto sob `/sinuca-aec/`, inicia
+na Home e abre em modo `standalone`. Não existe convite de instalação criado
+pelo frontend: Chrome/Android decide quando mostrar sua promoção nativa; no
+iPhone o usuário utiliza “Adicionar à Tela de Início” no menu do navegador.
+
+Os ícones ficam em `assets/icons/`: 192 e 512 px comuns, 192 e 512 px com área
+segura `maskable`, além de `apple-touch-icon.png` com 180 px. Todos usam fundo
+branco e o escudo oficial centralizado.
 
 ## Geração de arquivos
 

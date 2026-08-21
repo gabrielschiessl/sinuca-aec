@@ -16,7 +16,8 @@ temporadas por planilha; e gera documentos XLSX/DOCX para impressão.
 - URL de produção: `https://netzup.com.br/sinuca-aec/`.
 - Hospedagem: HostGator/cPanel, dentro de uma instalação cujo domínio principal
   também possui WordPress.
-- Frontend: SPA em HTML, CSS e JavaScript ES Modules, sem bundler.
+- Frontend: SPA em HTML, CSS e JavaScript ES Modules, sem bundler; instalável
+  como PWA sem convite de instalação criado pela interface.
 - API principal: PHP 8.3 + MySQL, em `api/`.
 - Backend alternativo/QAS: Google Apps Script + Google Sheets, selecionado com
   `?api=appscript` ou `?api=apps-script`.
@@ -25,7 +26,7 @@ temporadas por planilha; e gera documentos XLSX/DOCX para impressão.
   e-mails autorizados no servidor.
 - Idioma e domínio do negócio: português do Brasil.
 - Temporada inicial conhecida pelo frontend: 2026 (`js/config.js`).
-- API PHP anuncia versão `2.0.0` no endpoint `status`.
+- API PHP anuncia versão `2.1.0` no endpoint `status`.
 
 ## Arquivos que devem ser preservados no servidor
 
@@ -48,6 +49,8 @@ Não publicar `.git`, `.tmp`, `tmp`, `outputs`, dumps ou backups.
 
 Cada pasta de rota contém um `index.html` que redireciona para a SPA mantendo a
 URL amigável. O `404.html` reconstrói a rota quando a hospedagem entrega 404.
+`manifest.webmanifest` e `service-worker.js` cuidam da instalação PWA e do
+fallback conservador do casco estático; a API não é interceptada pelo worker.
 
 ## Regras essenciais
 

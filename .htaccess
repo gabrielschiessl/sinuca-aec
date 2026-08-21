@@ -1,11 +1,17 @@
 # O aplicativo e uma SPA atualizada com frequencia. O navegador deve sempre
 # revalidar HTML, JavaScript e CSS, evitando versoes antigas apos uma publicacao.
 <IfModule mod_headers.c>
-  <FilesMatch "\.(?:html?|css|js|mjs)$">
+  <FilesMatch "\.(?:html?|css|js|mjs|webmanifest)$">
     Header always set Cache-Control "no-cache, must-revalidate, max-age=0"
     Header always set Pragma "no-cache"
     Header always set Expires "0"
   </FilesMatch>
+</IfModule>
+
+<IfModule mod_headers.c>
+  <Files "service-worker.js">
+    Header always set Service-Worker-Allowed "/sinuca-aec/"
+  </Files>
 </IfModule>
 
 # Mantem os recursos pesados e versionados pelo proprio nome em cache.
