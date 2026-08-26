@@ -1,6 +1,17 @@
 import { loginGoogle, logoutAdmin, validateAdminSession } from "./api.js";
 
 const SESSION_STORAGE_KEY = "aec_admin_session";
+const REDIRECT_ERROR_STORAGE_KEY = "aec_admin_redirect_error";
+
+export function consumeGoogleRedirectError() {
+  try {
+    const message = sessionStorage.getItem(REDIRECT_ERROR_STORAGE_KEY) || "";
+    sessionStorage.removeItem(REDIRECT_ERROR_STORAGE_KEY);
+    return message;
+  } catch (error) {
+    return "";
+  }
+}
 
 export function getStoredAdminSession() {
   try {

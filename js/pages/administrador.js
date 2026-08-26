@@ -2,10 +2,10 @@ import { renderNavbar } from "../components/navbar.js";
 import { renderFooter } from "../components/footer.js";
 import {
   authenticateWithGoogle,
+  consumeGoogleRedirectError,
   endAdminSession,
   restoreAdminSession,
 } from "../auth.js";
-import { GOOGLE_CLIENT_ID } from "../config.js";
 import {
   getAdminJogadores,
   getAdminPartidas,
@@ -29,8 +29,14 @@ import {
   saveAdminTemporadaLegada,
   saveAdminTaxaInscricao,
   saveAdminRankingReference,
+  usesAppsScriptBackend,
 } from "../api.js";
-import { setKnownCurrentSeason, withBasePath } from "../config.js";
+import {
+  BASE_PATH,
+  GOOGLE_CLIENT_ID,
+  setKnownCurrentSeason,
+  withBasePath,
+} from "../config.js";
 import { resetPageScroll } from "../utils/pageScroll.js";
 import { exportChampionshipSpreadsheet } from "../utils/championshipSpreadsheet.js";
 
@@ -80,6 +86,7 @@ export function renderAdministrador() {
 }
 
 async function initializeAdminPage() {
+  const redirectError = consumeGoogleRedirectError();
   try {
     const session = await restoreAdminSession();
 
@@ -95,7 +102,7 @@ async function initializeAdminPage() {
     return;
   }
 
-  renderLogin();
+  renderLogin(redirectError);
 }
 
 function renderLogin(message = "") {
@@ -125,10 +132,17 @@ async function mountGoogleButton() {
     const googleAccounts = await waitForGoogleIdentity();
     if (!document.body.contains(button)) return;
 
-    googleAccounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      callback: handleGoogleCredential,
-    });
+    const useRedirect = isIosStandalone() && !usesAppsScriptBackend();
+    googleAccounts.id.initialize(useRedirect
+      ? {
+          client_id: GOOGLE_CLIENT_ID,
+          ux_mode: "redirect",
+          login_uri: `${window.location.origin}${BASE_PATH}/api/google-login-redirect.php`,
+        }
+      : {
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleGoogleCredential,
+        });
     googleAccounts.id.renderButton(button, {
       type: "standard",
       theme: "outline",
@@ -142,6 +156,14 @@ async function mountGoogleButton() {
     button.innerHTML = `<button class="btn" type="button" data-admin-retry>Carregar login do Google</button>`;
     button.querySelector("[data-admin-retry]")?.addEventListener("click", mountGoogleButton);
   }
+}
+
+function isIosStandalone() {
+  const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isStandalone = window.matchMedia("(display-mode: standalone)").matches
+    || navigator.standalone === true;
+  return isIos && isStandalone;
 }
 
 function waitForGoogleIdentity(timeout = 10000) {

@@ -1,10 +1,13 @@
+import { horizontalSwipeHint } from "./horizontalSwipeHint.js";
+
 export function classificationTable(classificacao = []) {
   if (!classificacao.length) {
     return '<p class="stats-empty">Nenhum participante encontrado.</p>';
   }
 
   return `
-    <div class="stats-table-scroll">
+    ${horizontalSwipeHint("classification")}
+    <div class="stats-table-scroll" data-horizontal-drag>
       <table class="stats-table classification-table">
         <thead>
           <tr>

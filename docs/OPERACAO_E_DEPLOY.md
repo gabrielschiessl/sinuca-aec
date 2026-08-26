@@ -86,6 +86,15 @@ As origens JavaScript devem incluir localhost usado no desenvolvimento e
 com o `google_client_id` do backend. Autorização final depende também da lista
 privada `admin_emails`.
 
+Para o login dentro do PWA instalado no iPhone, cadastrar também como URI de
+redirecionamento autorizada:
+
+`https://netzup.com.br/sinuca-aec/api/google-login-redirect.php`
+
+O arquivo precisa ser publicado junto da API. Ele aceita somente POST do fluxo
+Google, valida o token CSRF, cria a sessão pelo mesmo `AuthService` e retorna ao
+Administrador sem expor o token de sessão na URL.
+
 ## Apps Script
 
 Ao atualizar QAS:
@@ -129,6 +138,8 @@ visual, substituir mantendo nome e dimensão: `pwa-192.png`, `pwa-512.png`,
 | “Erro ao acessar a API” | Network, JSON, status HTTP, `debug`, logs PHP |
 | Alteração foi para Sheets | URL contém `?api=appscript` |
 | Login `origin_mismatch` | origem cadastrada no Google Cloud |
+| Login `redirect_uri_mismatch` no PWA | URI exata de `google-login-redirect.php` cadastrada no Google Cloud |
+| PWA volta do Google sem autenticar | endpoint publicado, resposta POST nos logs e storage permitido no iPhone |
 | Conta sem acesso | `admin_emails` e e-mail autenticado |
 | DOCX não gera | modelo, extensões ZIP/DOM, taxa e datas |
 | XLSX não gera | CDN ExcelJS, imagens e dataset da API |

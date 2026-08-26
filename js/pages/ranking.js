@@ -1,5 +1,7 @@
 import { renderNavbar } from "../components/navbar.js";
 import { renderFooter } from "../components/footer.js";
+import { horizontalSwipeHint } from "../components/horizontalSwipeHint.js";
+import { setupHorizontalDragScroll } from "../components/horizontalDragScroll.js";
 import { getRanking } from "../api.js";
 
 export function renderRanking() {
@@ -38,14 +40,18 @@ async function loadRanking(app) {
       return;
     }
     content.innerHTML = `
-      <div class="ranking-table-scroll">
-        <table class="ranking-table">
-          <thead><tr><th>Posição</th><th>Jogador</th><th>Total</th>${data.periodo.map((year) => `<th>${year}</th>`).join("")}</tr></thead>
-          <tbody>${data.ranking.map(rankingRow).join("")}</tbody>
-        </table>
+      <div class="ranking-table-card">
+        ${horizontalSwipeHint()}
+        <div class="ranking-table-scroll" data-horizontal-drag>
+          <table class="ranking-table">
+            <thead><tr><th>Posição</th><th>Jogador</th><th>Total</th>${data.periodo.map((year) => `<th>${year}</th>`).join("")}</tr></thead>
+            <tbody>${data.ranking.map(rankingRow).join("")}</tbody>
+          </table>
+        </div>
       </div>
       <p class="ranking-note"><i class="bi bi-info-circle"></i> Em caso de empate, permanece à frente quem ocupava a melhor posição no ranking anterior.</p>
     `;
+    setupHorizontalDragScroll(content);
     setupStickyRankingHeader(content.querySelector(".ranking-table-scroll"));
   } catch (error) {
     content.innerHTML = `<div class="error-state"><i class="bi bi-exclamation-circle"></i><p>${escapeHtml(error.message || "Não foi possível carregar o ranking.")}</p><button class="btn btn-outline" type="button" data-ranking-retry>Tentar novamente</button></div>`;

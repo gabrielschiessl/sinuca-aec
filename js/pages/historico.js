@@ -5,6 +5,7 @@ import { filters } from "../components/filters.js";
 import { roundList } from "../components/roundList.js";
 import { classificationTable } from "../components/classificationTable.js";
 import { resultsTable } from "../components/resultsTable.js";
+import { setupHorizontalDragScroll } from "../components/horizontalDragScroll.js";
 import { initFilters } from "../utils/filterController.js";
 import { getEstatisticas, getRodadas, getTemporadas } from "../api.js";
 import { resetPageScroll } from "../utils/pageScroll.js";
@@ -89,6 +90,8 @@ async function loadHistorySelection() {
     roundContent.innerHTML = `${filters({ rodadas: rounds, jogadores: getPlayers(rounds) })}${roundList(rounds)}`;
     classificationContent.innerHTML = classificationTable(stats.classificacao);
     resultsContent.innerHTML = resultsTable(stats.jogadores, stats.total_rodadas);
+    setupHorizontalDragScroll(classificationContent);
+    setupHorizontalDragScroll(resultsContent);
     initFilters();
   } catch (error) {
     renderHistoryError(error.message || "Não foi possível carregar esta temporada.");

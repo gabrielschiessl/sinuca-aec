@@ -7,6 +7,7 @@ import { filters } from "../components/filters.js";
 import { initFilters } from "../utils/filterController.js";
 import { classificationTable } from "../components/classificationTable.js";
 import { resultsTable } from "../components/resultsTable.js";
+import { setupHorizontalDragScroll } from "../components/horizontalDragScroll.js";
 import { resetPageScroll } from "../utils/pageScroll.js";
 
 export async function renderSerie({ divisao, title }) {
@@ -84,6 +85,8 @@ async function loadEstatisticas(divisao) {
       estatisticas.jogadores,
       estatisticas.total_rodadas,
     );
+    setupHorizontalDragScroll(classificationContent);
+    setupHorizontalDragScroll(resultsContent);
   } catch (error) {
     if (!classificationContent.isConnected || !resultsContent.isConnected) {
       return;

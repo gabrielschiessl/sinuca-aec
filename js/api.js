@@ -12,6 +12,10 @@ const API_URL = API_BACKEND === "appscript"
   ? APPS_SCRIPT_QAS_API_URL
   : MYSQL_API_URL;
 
+export function usesAppsScriptBackend() {
+  return API_BACKEND === "appscript";
+}
+
 const CACHE_TTL = 60_000;
 const cache = new Map();
 

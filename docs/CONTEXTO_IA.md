@@ -24,6 +24,8 @@ temporadas por planilha; e gera documentos XLSX/DOCX para impressão.
 - Backend padrão: MySQL; `?api=mysql` é desnecessário.
 - Autenticação administrativa: Google Identity Services e lista privada de
   e-mails autorizados no servidor.
+- No PWA standalone do iPhone, o login Google usa redirect para
+  `api/google-login-redirect.php`; navegadores comuns continuam em popup.
 - Idioma e domínio do negócio: português do Brasil.
 - Temporada inicial conhecida pelo frontend: 2026 (`js/config.js`).
 - API PHP anuncia versão `2.1.0` no endpoint `status`.
@@ -32,6 +34,7 @@ temporadas por planilha; e gera documentos XLSX/DOCX para impressão.
 
 - `api/config.local.php`: credenciais locais; nunca versionar.
 - `api/templates/regulamento-aec.docx`: modelo obrigatório para gerar DOCX.
+- `api/google-login-redirect.php`: retorno seguro do Google para o PWA/iPhone.
 - `assets/templates/modelo-temporada-historica.xlsx`: modelo de importação.
 - `.htaccess`: política de cache/revalidação.
 

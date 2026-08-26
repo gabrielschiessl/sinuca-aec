@@ -49,11 +49,11 @@ caso declarar a limitação e validar em QAS/servidor antes de produção.
 |---|---|
 | Home | ano imediato, navegação e scroll no topo; botão de retorno ao topo ausente |
 | Navegação | botão flutuante após rolagem nas rotas internas, retorno suave e safe area do iPhone |
-| Séries | três tabs; filtros combinados de rodada, jogador e pendentes; folga; cards em desktop/mobile |
-| Histórico | ano padrão, A/B ausente, filtros sticky |
-| Ranking | 5 anos, 30 posições, empate, W.O. direto, header sticky |
+| Séries | três tabs; filtros combinados; folga; dica lateral sempre em Resultados e na Classificação somente <= 388 px; tabelas arrastáveis com mouse |
+| Histórico | ano padrão, A/B ausente, filtros sticky; dica lateral sempre em Resultados e na Classificação somente <= 388 px; tabelas arrastáveis com mouse |
+| Ranking | 5 anos, 30 posições, empate, W.O. direto, header sticky; dica lateral fixa no card somente em touch <= 907 px; tabela arrastável com mouse |
 | Regra | três tabs, taxa dinâmica, responsividade <= 410 px |
-| Login | autorizado, não autorizado, sessão restaurada, logout |
+| Login | autorizado, não autorizado, sessão restaurada, logout; popup no navegador e redirect no PWA/iPhone |
 | Partidas | 2x0, 2x1, ao vivo, data em qualquer dia, salvar tudo; filtros combinados de rodada, jogador e pendentes |
 | W.O. | esquerda, direita, ambos, observações e ranking |
 | Participantes | troca, duplicidade, desempate, W.O., Safari sem zoom |
@@ -103,6 +103,8 @@ Inputs focáveis no iOS devem ter fonte de pelo menos 16 px para evitar zoom.
    API, login e bibliotecas CDN não possuem garantia offline.
 7. Instalar no Android/desktop e confirmar modo standalone e ícone.
 8. Adicionar à Tela de Início no Safari/iPhone e confirmar ícone e abertura.
+9. Pelo ícone instalado no iPhone, entrar em Administrador, selecionar a conta
+   Google, confirmar retorno autenticado à mesma PWA e restauração após fechá-la.
 
 ## Teste seguro de escrita
 

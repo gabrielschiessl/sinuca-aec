@@ -1,3 +1,5 @@
+import { horizontalSwipeHint } from "./horizontalSwipeHint.js";
+
 export function resultsTable(jogadores = [], totalRodadas = 0) {
   if (!jogadores.length) {
     return '<p class="stats-empty">Nenhum participante encontrado.</p>';
@@ -6,7 +8,8 @@ export function resultsTable(jogadores = [], totalRodadas = 0) {
   const rodadas = Array.from({ length: totalRodadas }, (_, indice) => indice + 1);
 
   return `
-    <div class="stats-table-scroll">
+    ${horizontalSwipeHint("results")}
+    <div class="stats-table-scroll" data-horizontal-drag>
       <table class="stats-table results-table">
         <thead>
           <tr>

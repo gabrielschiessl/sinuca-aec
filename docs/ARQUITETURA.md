@@ -32,6 +32,20 @@ Não há framework, bundler ou gerenciador de pacotes. `index.html` carrega
 - `manifest.webmanifest`: metadados de instalação da PWA.
 - `service-worker.js`: instalação, atualização e fallback do casco estático.
 
+O login Google usa callback popup nos navegadores comuns. No PWA standalone do
+iPhone, usa redirect para `api/google-login-redirect.php`; o endpoint valida o
+CSRF enviado pelo Google, reutiliza `AuthService`, grava a sessão no storage da
+origem e retorna à rota administrativa sem colocar o token na URL.
+
+No ranking e nos cards de Classificação e Resultados das séries e do histórico,
+a tabela permanece como a única região de rolagem horizontal. Uma indicação
+externa a essa região, mas dentro do card, orienta o gesto lateral sem acompanhar
+o deslocamento da tabela. Ela é sempre visível em Resultados, aparece na
+Classificação até 388 px e, no Ranking, somente em touch até 907 px.
+Em dispositivos com mouse, as três tabelas também aceitam clicar, segurar e
+arrastar horizontalmente, com cursores `grab`/`grabbing`; toque, trackpad e a
+barra de rolagem permanecem disponíveis como alternativas nativas.
+
 Os filtros de rodada, jogador e pendência são aplicados no cliente sobre os
 cards já carregados. Nas séries, o status vem de `data-status`; no painel
 administrativo, a pendência considera `data-original-status`, isto é, o estado
