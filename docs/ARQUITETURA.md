@@ -60,7 +60,7 @@ sincronizado após cada renderização de rota.
 ```text
 /
 ├── index.html, 404.html, .htaccess, manifest.webmanifest, service-worker.js
-├── administrador/, serie-a/, serie-b/, regra/, historico/, ranking/
+├── administrador/, serie-a/, serie-b/, regra/, historico/, ranking/, placar/
 │   └── index.html              # entradas das rotas amigáveis
 ├── js/
 │   ├── app.js, router.js, config.js, api.js, auth.js
@@ -115,6 +115,21 @@ sequenceDiagram
 `navigate()` preserva a query string (inclusive seleção de backend), redefine o
 scroll e força navegação de documento ao sair da Home para evitar herança de
 scroll em navegadores móveis.
+
+### Placar de mesa
+
+`/placar` é uma rota funcional deliberadamente ausente dos menus. O módulo
+`js/pages/placar.js` adapta o marcador do projeto legado RegraBrasileira ao
+design e à infraestrutura desta SPA. Pontos, nomes, vitórias e histórico das
+partidas ficam exclusivamente no `localStorage` do dispositivo, sob a chave
+`aec_sinuca_placar`; a tela não consulta nem escreve na API. Bolas, mapa da mesa,
+logos e ícones próprios usam SVGs do projeto atual. A rota `/regra` concentra o
+conteúdo normativo, evitando sua duplicação dentro do marcador.
+
+Enquanto o marcador permanece visível, o módulo solicita um bloqueio de tela
+pela Screen Wake Lock API. O bloqueio é solicitado novamente quando o documento
+volta ao primeiro plano e liberado ao navegar para outra rota. A indisponibilidade
+ou recusa do navegador é tratada silenciosamente e não impede o uso do placar.
 
 ## API PHP
 

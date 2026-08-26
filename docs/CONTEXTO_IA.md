@@ -48,6 +48,8 @@ Não publicar `.git`, `.tmp`, `tmp`, `outputs`, dumps ou backups.
 - `/regra`: Regra, bolas e regulamento.
 - `/historico`: temporadas arquivadas.
 - `/ranking`: ranking móvel de cinco temporadas.
+- `/placar`: marcador autônomo da Regra Brasileira, ainda sem acesso pelos menus,
+  com solicitação de Screen Wake Lock enquanto a rota estiver visível.
 - `/administrador`: login e painel administrativo.
 
 Cada pasta de rota contém um `index.html` que redireciona para a SPA mantendo a
@@ -136,6 +138,7 @@ as rodadas das duas divisões da temporada selecionada.
 6. Validar mobile/Safari; inputs abaixo de 16 px provocam zoom automático no iOS.
 7. As páginas e planilhas têm regras de impressão e responsividade específicas.
 8. Atualizar esta documentação no mesmo trabalho.
+9. O placar usa somente `localStorage`; não cria partidas nem altera dados da API.
 
 ## Pendências conhecidas em 19/08/2026
 

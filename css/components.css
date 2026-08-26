@@ -693,6 +693,125 @@
   [data-horizontal-drag].is-dragging { cursor:grabbing; user-select:none; }
 }
 
+/* Placar autônomo da Regra Brasileira */
+.scorekeeper-page {
+  min-height:calc(100vh - var(--header-height));
+  padding:32px 18px 0;
+  background:var(--page-bg);
+}
+
+.scorekeeper-shell {
+  width:min(760px,100%);
+  margin:0 auto 34px;
+  padding:28px;
+  border:1px solid var(--border);
+  border-radius:16px;
+  background:var(--panel-bg);
+  box-shadow:var(--shadow);
+}
+
+.scorekeeper-heading { margin-bottom:24px; text-align:center; }
+.scorekeeper-heading h1 { margin:5px 0 4px; color:white; font-size:clamp(1.75rem,5vw,2.4rem); }
+.scorekeeper-heading p { margin:0; color:var(--text-muted); }
+.scorekeeper-kicker { color:var(--tab-accent); font-size:.76rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+
+.scorekeeper-player {
+  padding:20px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:var(--group-bg);
+}
+
+.scorekeeper-player-header { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-bottom:18px; }
+.scorekeeper-player-header > label { min-width:0; overflow-wrap:anywhere; color:white; font-size:1.18rem; font-weight:800; }
+.scorekeeper-points-field { flex:0 0 auto; display:grid; grid-template-columns:42px 82px 42px; overflow:hidden; border:1px solid var(--border-highlight); border-radius:11px; background:var(--surface-darkest); }
+.scorekeeper-points-field button { display:grid; place-items:center; min-height:48px; padding:0; border:0; background:transparent; color:var(--text-muted); font-size:1.15rem; cursor:pointer; }
+.scorekeeper-points-field button:hover { color:white; background:rgba(255,255,255,.05); }
+.scorekeeper-points-field input { min-width:0; width:100%; padding:6px; border:0; border-right:1px solid var(--border); border-left:1px solid var(--border); outline:0; background:transparent; color:white; font:800 1.5rem/1 "Poppins",sans-serif; text-align:center; appearance:textfield; }
+.scorekeeper-points-field input::-webkit-inner-spin-button { appearance:none; }
+
+.scorekeeper-balls { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+.scorekeeper-ball-button { min-width:0; min-height:64px; display:flex; align-items:center; justify-content:center; gap:9px; padding:10px; border:1px solid var(--border); border-radius:11px; background:var(--surface-darkest); color:white; font:700 1rem "Poppins",sans-serif; cursor:pointer; transition:transform var(--transition),border-color var(--transition),background var(--transition); }
+.scorekeeper-ball-button img { width:34px; height:34px; object-fit:contain; }
+.scorekeeper-ball-button:hover { border-color:var(--border-highlight); background:var(--accent); transform:translateY(-1px); }
+.scorekeeper-ball-button:active { transform:scale(.97); }
+.scorekeeper-penalty-button i { display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:#f1edee; color:var(--surface-black); font-size:1.05rem; }
+
+.scorekeeper-summary { margin:18px 0; padding:20px; border:1px solid var(--border-highlight); border-radius:14px; background:var(--surface-darkest); }
+.scorekeeper-difference { display:flex; align-items:center; justify-content:space-between; gap:18px; color:var(--text-muted); }
+.scorekeeper-difference strong { color:white; font-size:1.05rem; text-align:right; }
+.scorekeeper-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:18px 0; }
+.scorekeeper-actions .btn { width:100%; min-height:48px; }
+.scorekeeper-match-score { display:flex; align-items:center; justify-content:center; gap:14px; padding-top:17px; border-top:1px solid var(--border); color:var(--text-muted); }
+.scorekeeper-match-score span { margin-right:4px; font-weight:600; }
+.scorekeeper-match-score strong { display:grid; place-items:center; min-width:48px; height:48px; border:1px solid var(--border); border-radius:10px; background:var(--panel-bg); color:white; font-size:1.35rem; }
+.scorekeeper-match-score i { color:var(--text-muted); font-style:normal; font-weight:800; }
+
+.scorekeeper-reference { margin-top:20px; padding:20px; border:1px solid var(--border); border-radius:14px; background:var(--group-bg); }
+.scorekeeper-reference h2 { margin:0 0 12px; color:white; font-size:1rem; }
+.scorekeeper-reference-row { display:grid; grid-template-columns:34px 1fr; align-items:center; gap:12px; padding:11px 0; border-top:1px solid var(--border); }
+.scorekeeper-reference-row img { width:30px; height:30px; }
+.scorekeeper-reference-row div { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.scorekeeper-reference-row strong { color:white; font-size:.9rem; }
+.scorekeeper-reference-row span { color:var(--text-muted); font-size:.72rem; line-height:1.45; }
+
+.scorekeeper-tools { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:20px; }
+.scorekeeper-tool { min-width:0; min-height:76px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; padding:10px 6px; border:1px solid var(--border); border-radius:11px; background:var(--surface-darkest); color:var(--text-primary); font:600 .76rem "Poppins",sans-serif; cursor:pointer; transition:border-color var(--transition),background var(--transition); }
+.scorekeeper-tool i { color:var(--tab-accent); font-size:1.2rem; }
+.scorekeeper-tool:hover { border-color:var(--border-highlight); background:var(--accent); }
+
+.scorekeeper-modal-backdrop { position:fixed; z-index:1000; inset:0; display:grid; place-items:center; overflow-y:auto; padding:18px; background:rgba(10,3,6,.82); backdrop-filter:blur(5px); }
+.scorekeeper-modal { box-sizing:border-box; width:min(520px,100%); max-height:calc(100dvh - 36px); overflow-y:auto; padding:28px; border:1px solid var(--border-highlight); border-radius:16px; background:var(--panel-bg); box-shadow:0 20px 70px rgba(0,0,0,.5); color:var(--text-primary); text-align:center; }
+.scorekeeper-modal h2 { margin:10px 0 7px; color:white; font-size:1.55rem; }
+.scorekeeper-modal > p { margin:0 auto 20px; color:var(--text-muted); line-height:1.55; }
+.scorekeeper-modal-icon { display:grid; place-items:center; width:54px; height:54px; margin:0 auto; border-radius:50%; background:rgba(171,41,89,.14); color:var(--tab-accent); font-size:1.55rem; }
+.scorekeeper-modal-icon.is-warning { color:#d75378; }
+.scorekeeper-modal-actions { display:flex; justify-content:center; gap:10px; margin-top:22px; }
+.scorekeeper-modal-actions .btn { min-width:130px; }
+.scorekeeper-name-fields { display:grid; gap:13px; margin-top:20px; text-align:left; }
+.scorekeeper-name-fields label { display:grid; gap:6px; color:var(--text-muted); font-size:.75rem; font-weight:600; }
+.scorekeeper-name-fields input { box-sizing:border-box; width:100%; min-height:48px; padding:11px 13px; border:1px solid var(--border); border-radius:9px; outline:0; background:var(--surface-darkest); color:white; font:400 1rem "Poppins",sans-serif; }
+.scorekeeper-name-fields input:focus { border-color:var(--tab-accent); }
+.scorekeeper-ball-legend { display:grid; grid-template-columns:1fr 1fr; gap:7px 14px; margin:20px 0; text-align:left; }
+.scorekeeper-ball-legend div { display:grid; grid-template-columns:28px 1fr auto; align-items:center; gap:8px; padding:8px; border-bottom:1px solid var(--border); }
+.scorekeeper-ball-legend img { width:26px; height:26px; }
+.scorekeeper-ball-legend span { color:white; font-size:.82rem; }
+.scorekeeper-ball-legend strong { color:var(--text-muted); font-size:.7rem; }
+.scorekeeper-table-map { display:block; width:min(230px,72%); max-height:330px; margin:18px auto 10px; object-fit:contain; }
+.scorekeeper-table-size { font-size:.75rem; }
+.scorekeeper-final-score { margin:18px 0; color:white; font-size:2rem; font-weight:900; }
+.scorekeeper-final-score i { padding:0 12px; color:var(--text-muted); font-style:normal; }
+.scorekeeper-history { padding:16px; border:1px solid var(--border); border-radius:11px; background:var(--surface-darkest); text-align:left; }
+.scorekeeper-history h3 { margin:0 0 10px; color:white; font-size:.9rem; }
+.scorekeeper-history ol { margin:0; padding-left:22px; }
+.scorekeeper-history li { padding:7px 0; color:var(--text-primary); font-size:.78rem; }
+.scorekeeper-history li small { display:block; color:var(--text-muted); }
+.scorekeeper-history p { margin:0; color:var(--text-muted); font-size:.8rem; }
+
+@media (max-width:600px) {
+  .scorekeeper-page { padding:20px 12px 0; }
+  .scorekeeper-shell { padding:16px; border-radius:13px; }
+  .scorekeeper-heading { margin-bottom:18px; }
+  .scorekeeper-heading p { font-size:.86rem; }
+  .scorekeeper-player { padding:14px; }
+  .scorekeeper-player-header { align-items:flex-start; flex-direction:column; gap:10px; }
+  .scorekeeper-points-field { width:100%; grid-template-columns:46px 1fr 46px; }
+  .scorekeeper-balls { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .scorekeeper-actions { grid-template-columns:1fr; }
+  .scorekeeper-tools { grid-template-columns:1fr 1fr; }
+}
+
+@media (max-width:380px) {
+  .scorekeeper-page { padding-inline:8px; }
+  .scorekeeper-shell { padding:12px; }
+  .scorekeeper-ball-button { min-height:58px; }
+  .scorekeeper-reference { padding:14px; }
+  .scorekeeper-modal { padding:22px 16px; }
+  .scorekeeper-modal-actions { flex-direction:column; }
+  .scorekeeper-modal-actions .btn { width:100%; }
+  .scorekeeper-ball-legend { grid-template-columns:1fr; }
+}
+
 .stats-table {
   width: 100%;
   border-collapse: collapse;

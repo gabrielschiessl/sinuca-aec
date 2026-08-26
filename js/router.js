@@ -5,6 +5,7 @@ import { renderAdministrador } from "./pages/administrador.js";
 import { renderRegra } from "./pages/regra.js";
 import { renderHistorico } from "./pages/historico.js";
 import { renderRanking } from "./pages/ranking.js";
+import { renderPlacar } from "./pages/placar.js";
 import { withBasePath, withoutBasePath } from "./config.js";
 import { resetPageScroll } from "./utils/pageScroll.js";
 
@@ -18,6 +19,7 @@ const routes = {
   "/regra": renderRegra,
   "/historico": renderHistorico,
   "/ranking": renderRanking,
+  "/placar": renderPlacar,
 };
 
 export function router() {

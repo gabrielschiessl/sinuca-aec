@@ -9,6 +9,25 @@
 - **Organização do campeonato:** define participantes, datas, resultados,
   desempates, taxa, temporada e documentos impressos.
 
+## Placar de mesa
+
+A rota direta `/placar` oferece um marcador auxiliar da Regra Brasileira, sem
+botão de acesso na Home, navbar ou demais páginas nesta etapa. Ela permite:
+
+- definir dois nomes;
+- somar de 1 a 7 pontos pelas bolas ou 7 pontos de penalidade;
+- corrigir o placar manualmente ou ponto a ponto;
+- acompanhar diferença e liderança;
+- encerrar partidas, contabilizar vitórias e consultar o histórico do jogo;
+- reiniciar a partida ou encerrar e limpar o jogo;
+- manter a tela ativa enquanto o placar estiver visível, quando permitido pelo
+  navegador e pelo sistema operacional;
+- consultar bolas, mapa da mesa e abrir a página completa de Regra.
+
+Todos esses dados são auxiliares e locais ao navegador. O placar não registra
+resultados oficiais, não autentica usuários e não escreve nos backends PHP ou
+Apps Script.
+
 ## Conceitos
 
 - **Jogador:** cadastro global, independente de ano e divisão.
