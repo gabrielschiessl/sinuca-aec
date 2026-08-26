@@ -1,4 +1,4 @@
-export function filters({ rodadas = [], jogadores = [] }) {
+export function filters({ rodadas = [], jogadores = [], showPending = false }) {
   return `
 
 <div class="filters">
@@ -79,6 +79,18 @@ export function filters({ rodadas = [], jogadores = [] }) {
 
     </div>
 
+    ${showPending ? `
+    <label class="filter-pending-toggle">
+        <input type="checkbox" id="filter-pending" />
+        <span><i class="bi bi-hourglass-split" aria-hidden="true"></i> Só partidas pendentes</span>
+    </label>
+    ` : ""}
+
+</div>
+
+<div class="round-filter-empty" data-round-filter-empty hidden>
+    <i class="bi bi-funnel" aria-hidden="true"></i>
+    <p>Nenhuma partida encontrada com os filtros selecionados.</p>
 </div>
 
 `;

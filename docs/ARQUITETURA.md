@@ -32,6 +32,15 @@ Não há framework, bundler ou gerenciador de pacotes. `index.html` carrega
 - `manifest.webmanifest`: metadados de instalação da PWA.
 - `service-worker.js`: instalação, atualização e fallback do casco estático.
 
+Os filtros de rodada, jogador e pendência são aplicados no cliente sobre os
+cards já carregados. Nas séries, o status vem de `data-status`; no painel
+administrativo, a pendência considera `data-original-status`, isto é, o estado
+persistido, para que uma edição ainda não salva não desapareça da tela.
+
+Todas as rotas, exceto a Home, recebem um botão flutuante reutilizável para
+retorno suave ao topo. O componente é criado uma única vez por `js/app.js` e
+sincronizado após cada renderização de rota.
+
 ## Mapa do repositório
 
 ```text

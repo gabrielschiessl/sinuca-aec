@@ -254,7 +254,7 @@ function renderDashboard(session) {
           <div><h2>Partidas</h2><p>Consulte status e placares da temporada atual.</p></div>
           <label><span>Divisão</span><select class="admin-select" data-admin-division><option value="A">Série A</option><option value="B">Série B</option></select></label>
         </div>
-        <div class="admin-match-filters">
+        <div class="admin-match-filters admin-match-filters-matches">
           <label class="admin-match-filter">
             <span><i class="bi bi-calendar3" aria-hidden="true"></i> Filtro de rodada</span>
             <select class="admin-select" data-admin-round-filter>
@@ -267,12 +267,20 @@ function renderDashboard(session) {
               <option value="">Todos os jogadores</option>
             </select>
           </label>
+          <label class="admin-pending-filter">
+            <input type="checkbox" data-admin-pending-filter>
+            <span><i class="bi bi-hourglass-split" aria-hidden="true"></i> Só partidas pendentes</span>
+          </label>
         </div>
         <div class="admin-bulk-actions">
           <span data-admin-pending-count>Nenhuma alteração pendente</span>
           <button class="btn" type="button" data-save-all disabled>Salvar tudo</button>
         </div>
         <div data-admin-matches></div>
+        <div class="admin-filter-empty" data-admin-match-filter-empty hidden>
+          <i class="bi bi-funnel" aria-hidden="true"></i>
+          <p>Nenhuma partida encontrada com os filtros selecionados.</p>
+        </div>
       </section>
 
       <section class="admin-participants-module" data-admin-tool-section="participantes" hidden>
@@ -387,6 +395,7 @@ function renderDashboard(session) {
   page.querySelector("[data-admin-division]")?.addEventListener("change", (event) => loadAdminMatches(event.target.value, false));
   page.querySelector("[data-admin-round-filter]")?.addEventListener("change", applyAdminMatchFilters);
   page.querySelector("[data-admin-player-filter]")?.addEventListener("change", applyAdminMatchFilters);
+  page.querySelector("[data-admin-pending-filter]")?.addEventListener("change", applyAdminMatchFilters);
   page.querySelector("[data-save-all]")?.addEventListener("click", () => saveAllMatchChanges(page.querySelector("[data-admin-division]").value));
   page.querySelectorAll("[data-admin-tool]").forEach((button) => button.addEventListener("click", () => selectAdminTool(button.dataset.adminTool)));
   page.querySelector("[data-participant-division]")?.addEventListener("change", handleParticipantDivisionChange);
@@ -2283,6 +2292,11 @@ async function loadAdminMatches(divisao, preserveFilters = true) {
   if (!content || !activeAdminSession?.token) return;
   const previousRound = preserveFilters ? page.querySelector("[data-admin-round-filter]")?.value || "" : "";
   const previousPlayer = preserveFilters ? page.querySelector("[data-admin-player-filter]")?.value || "" : "";
+  const pendingFilter = page.querySelector("[data-admin-pending-filter]");
+  const previousPending = preserveFilters ? Boolean(pendingFilter?.checked) : false;
+  if (pendingFilter) pendingFilter.checked = previousPending;
+  const filterEmpty = page.querySelector("[data-admin-match-filter-empty]");
+  if (filterEmpty) filterEmpty.hidden = true;
   content.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Carregando partidas...</p></div>';
   try {
     const rodadas = await getAdminPartidas(activeAdminSession.token, divisao);
@@ -2341,17 +2355,32 @@ function applyAdminMatchFilters() {
   const page = getPage();
   const selectedRound = page?.querySelector("[data-admin-round-filter]")?.value || "";
   const selectedPlayer = page?.querySelector("[data-admin-player-filter]")?.value || "";
+  const onlyPending = page?.querySelector("[data-admin-pending-filter]")?.checked || false;
+  let visibleRounds = 0;
 
   page?.querySelectorAll("[data-admin-round]").forEach((round) => {
     let visibleMatches = 0;
     round.querySelectorAll("[data-admin-match]").forEach((match) => {
       const matchesRound = !selectedRound || match.dataset.round === selectedRound;
       const matchesPlayer = !selectedPlayer || match.dataset.player1 === selectedPlayer || match.dataset.player2 === selectedPlayer;
-      match.hidden = !(matchesRound && matchesPlayer);
+      const matchesPending = !onlyPending || match.dataset.originalStatus === "A";
+      match.hidden = !(matchesRound && matchesPlayer && matchesPending);
       if (!match.hidden) visibleMatches += 1;
     });
     round.hidden = visibleMatches === 0;
+    if (!round.hidden) visibleRounds += 1;
   });
+
+  const emptyState = page?.querySelector("[data-admin-match-filter-empty]");
+  if (emptyState) {
+    emptyState.hidden = visibleRounds > 0;
+    const message = emptyState.querySelector("p");
+    if (message) {
+      message.textContent = onlyPending
+        ? "Nenhuma partida pendente encontrada com os filtros selecionados."
+        : "Nenhuma partida encontrada com os filtros selecionados.";
+    }
+  }
 }
 
 function renderAdminMatch(partida) {
@@ -2610,6 +2639,7 @@ async function saveCards(cards, divisao) {
       card.querySelector("[data-save-match]").disabled = false;
     });
     updateCardDirtyState(cards[0]);
+    applyAdminMatchFilters();
     showAdminModal("Alterações salvas", `${cards.length} ${cards.length === 1 ? "partida foi atualizada" : "partidas foram atualizadas"} com sucesso.`, "success");
   } catch (error) {
     buttons.forEach((button) => { button.disabled = false; });

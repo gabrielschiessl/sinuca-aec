@@ -5,6 +5,9 @@ export function initFilters() {
   const playerFilter =
     document.getElementById("filter-player");
 
+  const pendingFilter =
+    document.getElementById("filter-pending");
+
   if (!roundFilter || !playerFilter) {
     return;
   }
@@ -19,6 +22,11 @@ export function initFilters() {
   playerFilter.addEventListener(
     "change",
     applyFilters
+  );
+
+  pendingFilter?.addEventListener(
+    "change",
+    applyFilters,
   );
 
   if (filters) {
@@ -55,6 +63,9 @@ function applyFilters() {
   const selectedPlayer =
     document.getElementById("filter-player").value;
 
+  const onlyPending =
+    document.getElementById("filter-pending")?.checked || false;
+
   const groups =
     document.querySelectorAll(".round-group");
 
@@ -74,8 +85,11 @@ function applyFilters() {
         card.dataset.player1 === selectedPlayer ||
         card.dataset.player2 === selectedPlayer;
 
+      const matchesPending =
+        !onlyPending || card.dataset.status === "A";
+
       const shouldShow =
-        matchesRound && matchesPlayer;
+        matchesRound && matchesPlayer && matchesPending;
 
       card.style.display =
         shouldShow ? "" : "none";
@@ -90,4 +104,18 @@ function applyFilters() {
         ? ""
         : "none";
   });
+
+  const hasVisibleGroups = [...groups].some(
+    (group) => group.style.display !== "none",
+  );
+  const emptyState = document.querySelector("[data-round-filter-empty]");
+  if (emptyState) {
+    emptyState.hidden = hasVisibleGroups;
+    const message = emptyState.querySelector("p");
+    if (message) {
+      message.textContent = onlyPending
+        ? "Nenhuma partida pendente encontrada com os filtros selecionados."
+        : "Nenhuma partida encontrada com os filtros selecionados.";
+    }
+  }
 }

@@ -47,13 +47,14 @@ caso declarar a limitação e validar em QAS/servidor antes de produção.
 
 | Área | Casos mínimos |
 |---|---|
-| Home | ano imediato, navegação e scroll no topo |
-| Séries | três tabs, filtros, folga, cards em desktop/mobile |
+| Home | ano imediato, navegação e scroll no topo; botão de retorno ao topo ausente |
+| Navegação | botão flutuante após rolagem nas rotas internas, retorno suave e safe area do iPhone |
+| Séries | três tabs; filtros combinados de rodada, jogador e pendentes; folga; cards em desktop/mobile |
 | Histórico | ano padrão, A/B ausente, filtros sticky |
 | Ranking | 5 anos, 30 posições, empate, W.O. direto, header sticky |
 | Regra | três tabs, taxa dinâmica, responsividade <= 410 px |
 | Login | autorizado, não autorizado, sessão restaurada, logout |
-| Partidas | 2x0, 2x1, ao vivo, data em qualquer dia, salvar tudo |
+| Partidas | 2x0, 2x1, ao vivo, data em qualquer dia, salvar tudo; filtros combinados de rodada, jogador e pendentes |
 | W.O. | esquerda, direita, ambos, observações e ranking |
 | Participantes | troca, duplicidade, desempate, W.O., Safari sem zoom |
 | Jogadores | novo, edição, ativação/inativação protegida |

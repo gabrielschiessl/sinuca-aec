@@ -124,7 +124,7 @@ function renderRodadas(content, rodadas) {
     return nomeA.localeCompare(nomeB, "pt-BR", { sensitivity: "base" });
   });
 
-  content.innerHTML = `${filters({ rodadas, jogadores })}${roundList(rodadas)}`;
+  content.innerHTML = `${filters({ rodadas, jogadores, showPending: true })}${roundList(rodadas)}`;
   initFilters();
 }
 

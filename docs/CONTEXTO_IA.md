@@ -88,7 +88,8 @@ fallback conservador do casco estático; a API não é interceptada pelo worker.
 
 Começa em modo visualização e exige ativação deliberada do modo edição. Abas:
 
-1. Partidas: datas, status, placares, W.O., observações e salvamento em lote.
+1. Partidas: datas, status, placares, W.O., observações, salvamento em lote e
+   filtros combinados de rodada, jogador e partidas pendentes (`status = A`).
 2. Participantes: jogador por número, desempate manual e W.O. direto.
 3. Jogadores: cadastro, nomes, apelidos e ativação.
 4. Temporadas: nova, atual e histórica; rascunho, importação, chaveamento,

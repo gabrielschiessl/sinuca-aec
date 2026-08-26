@@ -10,6 +10,7 @@ export function matchCard(partida) {
     class="match-card ${partida.status.codigo === "V" ? "live" : ""}"
     data-player1="${partida.jogador1.id}"
     data-player2="${partida.jogador2.id}"
+    data-status="${partida.status.codigo}"
 >
 
     <div class="match-header">
@@ -76,7 +77,7 @@ export function matchCard(partida) {
 export function byeMatchCard(jogador) {
   if (!jogador) return "";
   return `
-<div class="match-card bye" data-player1="${jogador.id}" data-player2="">
+<div class="match-card bye" data-player1="${jogador.id}" data-player2="" data-status="">
   <div class="match-header">
     <span class="status-badge status-bye">Folga</span>
   </div>

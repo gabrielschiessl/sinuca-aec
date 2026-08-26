@@ -26,6 +26,7 @@ export function router() {
   const page = routes[path] || renderHome;
 
   page();
+  window.dispatchEvent(new CustomEvent("app:route-rendered"));
 }
 
 export function navigate(path) {

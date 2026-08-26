@@ -1,10 +1,12 @@
 import { resetPageScroll, router } from "./router.js";
 import { BASE_PATH } from "./config.js";
+import { initBackToTopButton } from "./components/backToTopButton.js";
 
 if ("scrollRestoration" in window.history) {
   window.history.scrollRestoration = "manual";
 }
 
+initBackToTopButton();
 router();
 resetPageScroll();
 

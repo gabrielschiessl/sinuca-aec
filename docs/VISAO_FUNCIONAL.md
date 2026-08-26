@@ -76,6 +76,11 @@ atômica e auditada.
 - Horário padrão inicial: 19:00.
 - Data/hora da partida pode sobrescrever a data/hora da rodada.
 
+Nas páginas públicas das Séries A e B, os filtros de rodada, jogador e
+`Só partidas pendentes` são cumulativos. Uma partida pendente é a que possui
+status `A` (`Agendado`). Os badges dos grupos de rodada permanecem apenas
+informativos, sem comportamento de filtro.
+
 ## Estados e placares
 
 | Código | Estado | Regra |
@@ -141,6 +146,8 @@ que não podem ser inferidas automaticamente.
 - Se uma divisão não existir, exibe mensagem explícita.
 - Rodadas e jogador podem ser filtrados; classificação e matriz de resultados
   usam os mesmos componentes da temporada atual.
+- O filtro de pendentes é exclusivo das páginas da temporada vigente e não é
+  exibido no histórico.
 
 ## Documentos
 
