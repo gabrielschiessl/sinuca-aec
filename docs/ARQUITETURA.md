@@ -131,6 +131,31 @@ pela Screen Wake Lock API. O bloqueio é solicitado novamente quando o documento
 volta ao primeiro plano e liberado ao navegar para outra rota. A indisponibilidade
 ou recusa do navegador é tratada silenciosamente e não impede o uso do placar.
 
+`/placar/tv` reutiliza a mesma chave de estado e o mesmo módulo, mas renderiza um
+quadro widescreen sem controles clicáveis ou acesso administrativo. Um listener
+de teclado existe somente durante essa rota: `0` alterna a tacada; `1` a `7`
+pontuam o jogador ativo; `8` credita a falta de sete pontos ao adversário e
+transfere a tacada; `+`/`-` corrigem um ponto; `Backspace` restaura o snapshot da
+última ação; `Enter` encerra a partida; e `/` alterna a ajuda. O listener é
+removido ao sair da rota.
+
+`9` zera apenas os pontos e a tacada, preservando partidas e histórico; `*`
+abre a edição dos nomes e retorna ao próprio modo TV após a confirmação.
+`.` reinicia o jogo completo, zerando pontos, tacada, partidas e histórico sem
+apagar os nomes. Tanto `9` quanto `.` podem ser desfeitos imediatamente.
+
+A pontuação da tacada é mantida separadamente do placar total: `1` a `7` e `+`
+a incrementam, `-` a corrige, enquanto `0`, falta (`8`) e finalização a zeram.
+Os sete pontos concedidos por falta nunca integram a tacada do beneficiado.
+No quadro central, o contador da tacada e o conjunto de partidas compartilham a
+mesma largura; a diferença permanece em uma linha e reduz sua escala para não
+alterar a geometria dos cards laterais.
+
+Como `/placar/tv` possui dois segmentos, `index.html` define dinamicamente o
+elemento `base` antes de carregar CSS e JavaScript. Assim, recursos relativos
+continuam resolvidos a partir da raiz local ou de `/sinuca-aec/` depois que a
+rota é restaurada pela query string.
+
 ## API PHP
 
 `api/index.php` é um front controller:

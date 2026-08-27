@@ -1,6 +1,6 @@
 import { BASE_PATH } from "../config.js";
 
-export function renderNavbar({ title = "" } = {}) {
+export function renderNavbar({ title = "", hideAdmin = false } = {}) {
   const isAdminPage = title === "Administrador";
   const isRulesPage = title === "Regra" || title === "Regulamento";
   const isHistoryPage = title === "Histórico";
@@ -89,7 +89,7 @@ export function renderNavbar({ title = "" } = {}) {
     </div>
 
     <div class="header-right">
-      ${isAdminPage ? `
+      ${hideAdmin ? "" : isAdminPage ? `
         <div class="admin-desktop admin-header-session is-hidden" data-admin-header-session>
           <button class="btn btn-outline" type="button" data-admin-header-logout>
             <i class="bi bi-box-arrow-right" aria-hidden="true"></i> Sair

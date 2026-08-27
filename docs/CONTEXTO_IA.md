@@ -50,6 +50,8 @@ Não publicar `.git`, `.tmp`, `tmp`, `outputs`, dumps ou backups.
 - `/ranking`: ranking móvel de cinco temporadas.
 - `/placar`: marcador autônomo da Regra Brasileira, ainda sem acesso pelos menus,
   com solicitação de Screen Wake Lock enquanto a rota estiver visível.
+- `/placar/tv`: apresentação widescreen do mesmo placar, sem acesso pelos menus
+  nem botão administrativo e operada pelo teclado/controle numérico.
 - `/administrador`: login e painel administrativo.
 
 Cada pasta de rota contém um `index.html` que redireciona para a SPA mantendo a

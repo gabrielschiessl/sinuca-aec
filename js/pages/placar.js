@@ -18,8 +18,12 @@ let wakeLockSentinel = null;
 let wakeLockSession = 0;
 let wakeLockVisibilityHandler = null;
 let wakeLockRouteHandler = null;
+let tvKeyboardHandler = null;
+let tvRouteHandler = null;
+let tvUndoStack = [];
 
 export function renderPlacar() {
+  cleanupTvKeyboard();
   const app = document.getElementById("app");
   app.innerHTML = `
     ${renderNavbar({ title: "Placar" })}
@@ -86,6 +90,241 @@ export function renderPlacar() {
   if (!state.names[0] || !state.names[1]) openNamesModal(app);
 }
 
+export function renderPlacarTv() {
+  cleanupTvKeyboard();
+  tvUndoStack = [];
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    ${renderNavbar({ title: "Placar", hideAdmin: true })}
+    <main class="scorekeeper-tv-page">
+      <section class="scorekeeper-tv-shell" aria-label="Placar para televisão">
+        <div class="scorekeeper-tv-board">
+          ${tvPlayer(0)}
+
+          <section class="scorekeeper-tv-summary" aria-label="Resumo do jogo">
+            <div class="scorekeeper-tv-stroke-score">
+              <span>Tacada</span>
+              <strong data-tv-stroke>${state.strokeScore}</strong>
+            </div>
+            <div class="scorekeeper-tv-difference">
+              <span>Diferença</span>
+              <strong data-difference></strong>
+            </div>
+            <div class="scorekeeper-tv-match-score">
+              <span>Partidas</span>
+              <div><strong data-wins="0">${state.wins[0]}</strong><i>×</i><strong data-wins="1">${state.wins[1]}</strong></div>
+            </div>
+          </section>
+
+          ${tvPlayer(1)}
+        </div>
+
+        <p class="scorekeeper-tv-help-hint"><kbd>/</kbd> Ver botões e ações</p>
+      </section>
+    </main>
+    <div data-scorekeeper-modal></div>`;
+
+  renderState(app);
+  bindTvKeyboard(app);
+  setupScreenWakeLock(app);
+}
+
+function tvPlayer(index) {
+  return `<article class="scorekeeper-tv-player" data-tv-player="${index}">
+    <span class="scorekeeper-tv-break"><i class="bi bi-play-fill"></i> Tacada</span>
+    <h1 data-player-name="${index}">${escapeHtml(state.names[index] || `Jogador ${index + 1}`)}</h1>
+    <strong class="scorekeeper-tv-points" data-tv-points="${index}">${state.points[index]}</strong>
+  </article>`;
+}
+
+function bindTvKeyboard(app) {
+  const routeSession = Symbol("placar-tv");
+  tvKeyboardHandler = (event) => handleTvKey(event, app);
+  tvRouteHandler = () => {
+    if (!document.querySelector(".scorekeeper-tv-page")) cleanupTvKeyboard(routeSession);
+  };
+  tvKeyboardHandler.routeSession = routeSession;
+  document.addEventListener("keydown", tvKeyboardHandler);
+  window.addEventListener("app:route-rendered", tvRouteHandler);
+}
+
+function cleanupTvKeyboard(routeSession = null) {
+  if (routeSession && tvKeyboardHandler?.routeSession !== routeSession) return;
+  if (tvKeyboardHandler) document.removeEventListener("keydown", tvKeyboardHandler);
+  if (tvRouteHandler) window.removeEventListener("app:route-rendered", tvRouteHandler);
+  tvKeyboardHandler = null;
+  tvRouteHandler = null;
+}
+
+function handleTvKey(event, app) {
+  const key = event.key;
+  const helpOpen = Boolean(app.querySelector("[data-tv-help]"));
+  const modalOpen = Boolean(app.querySelector(".scorekeeper-modal-backdrop"));
+
+  if (key === "/" || event.code === "NumpadDivide") {
+    event.preventDefault();
+    if (helpOpen) closeModal(app);
+    else openTvHelp(app);
+    return;
+  }
+  if (helpOpen) {
+    if (key === "Escape") closeModal(app);
+    return;
+  }
+  if (modalOpen) {
+    if (key === "Escape") closeModal(app);
+    return;
+  }
+  if (event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
+
+  if (/^[1-7]$/.test(key)) {
+    event.preventDefault();
+    mutateTvState(app, () => {
+      state.points[state.breakPlayer] += Number(key);
+      state.strokeScore += Number(key);
+    });
+    return;
+  }
+  if (key === "8") {
+    event.preventDefault();
+    mutateTvState(app, () => {
+      const beneficiary = state.breakPlayer === 0 ? 1 : 0;
+      state.points[beneficiary] += 7;
+      state.breakPlayer = beneficiary;
+      state.strokeScore = 0;
+    });
+    return;
+  }
+  if (key === "9") {
+    event.preventDefault();
+    mutateTvState(app, () => {
+      state.points = [0, 0];
+      state.strokeScore = 0;
+    });
+    return;
+  }
+  if (key === "." || event.code === "NumpadDecimal") {
+    event.preventDefault();
+    mutateTvState(app, () => {
+      state.points = [0, 0];
+      state.wins = [0, 0];
+      state.history = [];
+      state.breakPlayer = 0;
+      state.strokeScore = 0;
+    });
+    return;
+  }
+  if (key === "*" || event.code === "NumpadMultiply") {
+    event.preventDefault();
+    openNamesModal(app, renderPlacarTv);
+    return;
+  }
+  if (key === "0") {
+    event.preventDefault();
+    mutateTvState(app, () => {
+      state.breakPlayer = state.breakPlayer === 0 ? 1 : 0;
+      state.strokeScore = 0;
+    });
+    return;
+  }
+  if (key === "+" || event.code === "NumpadAdd") {
+    event.preventDefault();
+    mutateTvState(app, () => {
+      state.points[state.breakPlayer] += 1;
+      state.strokeScore += 1;
+    });
+    return;
+  }
+  if (key === "-" || event.code === "NumpadSubtract") {
+    event.preventDefault();
+    if (state.points[state.breakPlayer] > 0) {
+      mutateTvState(app, () => {
+        state.points[state.breakPlayer] -= 1;
+        state.strokeScore = Math.max(0, state.strokeScore - 1);
+      });
+    }
+    return;
+  }
+  if (key === "Backspace") {
+    event.preventDefault();
+    undoTvAction(app);
+    return;
+  }
+  if (key === "Enter" || event.code === "NumpadEnter") {
+    event.preventDefault();
+    finishTvFrame(app);
+  }
+}
+
+function mutateTvState(app, action) {
+  tvUndoStack.push(snapshotTvState());
+  if (tvUndoStack.length > 100) tvUndoStack.shift();
+  action();
+  saveState();
+  renderState(app);
+}
+
+function snapshotTvState() {
+  return {
+    points: [...state.points],
+    wins: [...state.wins],
+    history: state.history.map((frame) => ({ ...frame, points: [...frame.points] })),
+    breakPlayer: state.breakPlayer,
+    strokeScore: state.strokeScore,
+  };
+}
+
+function undoTvAction(app) {
+  const previous = tvUndoStack.pop();
+  if (!previous) return;
+  state.points = previous.points;
+  state.wins = previous.wins;
+  state.history = previous.history;
+  state.breakPlayer = previous.breakPlayer;
+  state.strokeScore = previous.strokeScore;
+  saveState();
+  renderState(app);
+}
+
+function finishTvFrame(app) {
+  const [first, second] = state.points;
+  if (first === 0 && second === 0) {
+    showNotice(app, "Partida não iniciada", "Marque os pontos antes de finalizar a partida.");
+    return;
+  }
+  if (first === second) {
+    showNotice(app, "Placar empatado", "Defina o vencedor da partida antes de finalizá-la.");
+    return;
+  }
+
+  mutateTvState(app, () => {
+    const winner = first > second ? 0 : 1;
+    state.wins[winner] += 1;
+    state.history.push({ date: new Date().toISOString(), points: [first, second], winner });
+    state.points = [0, 0];
+    state.strokeScore = 0;
+  });
+}
+
+function openTvHelp(app) {
+  openModal(app, `<div data-tv-help>
+    <div class="scorekeeper-modal-icon"><i class="bi bi-keyboard-fill"></i></div>
+    <h2>Controles do placar</h2>
+    <dl class="scorekeeper-tv-key-list">
+      <div><dt><kbd>0</kbd></dt><dd>Troca a tacada</dd></div>
+      <div><dt><kbd>1–7</kbd></dt><dd>Adiciona pontos ao jogador na tacada</dd></div>
+      <div><dt><kbd>8</kbd></dt><dd>Falta: soma 7 ao adversário e passa a tacada</dd></div>
+      <div><dt><kbd>9</kbd></dt><dd>Zera os pontos sem finalizar a partida</dd></div>
+      <div><dt><kbd>.</kbd></dt><dd>Reinicia pontos, partidas e histórico</dd></div>
+      <div><dt><kbd>*</kbd></dt><dd>Altera os nomes dos jogadores</dd></div>
+      <div><dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>Corrige um ponto do jogador na tacada</dd></div>
+      <div><dt><kbd>Backspace</kbd></dt><dd>Desfaz a última ação</dd></div>
+      <div><dt><kbd>Enter</kbd></dt><dd>Finaliza a partida</dd></div>
+    </dl>
+    <p class="scorekeeper-tv-help-close">Pressione <kbd>/</kbd> ou <kbd>Esc</kbd> para fechar.</p>
+  </div>`);
+}
+
 function setupScreenWakeLock(app) {
   cleanupScreenWakeLock();
   if (!("wakeLock" in navigator)) return;
@@ -95,7 +334,7 @@ function setupScreenWakeLock(app) {
     if (document.visibilityState === "visible") requestScreenWakeLock(app, session);
   };
   wakeLockRouteHandler = () => {
-    if (!document.querySelector(".scorekeeper-page")) cleanupScreenWakeLock();
+    if (!document.querySelector(".scorekeeper-page, .scorekeeper-tv-page")) cleanupScreenWakeLock();
   };
 
   document.addEventListener("visibilitychange", wakeLockVisibilityHandler);
@@ -108,12 +347,12 @@ async function requestScreenWakeLock(app, session) {
     wakeLockSentinel ||
     session !== wakeLockSession ||
     document.visibilityState !== "visible" ||
-    !app.querySelector(".scorekeeper-page")
+    !app.querySelector(".scorekeeper-page, .scorekeeper-tv-page")
   ) return;
 
   try {
     const sentinel = await navigator.wakeLock.request("screen");
-    if (session !== wakeLockSession || !app.querySelector(".scorekeeper-page")) {
+    if (session !== wakeLockSession || !app.querySelector(".scorekeeper-page, .scorekeeper-tv-page")) {
       await sentinel.release();
       return;
     }
@@ -207,6 +446,14 @@ function renderState(app) {
   app.querySelectorAll("[data-wins]").forEach((element) => {
     element.textContent = state.wins[Number(element.dataset.wins)];
   });
+  app.querySelectorAll("[data-tv-points]").forEach((element) => {
+    element.textContent = state.points[Number(element.dataset.tvPoints)];
+  });
+  app.querySelectorAll("[data-tv-player]").forEach((element) => {
+    element.classList.toggle("is-active", Number(element.dataset.tvPlayer) === state.breakPlayer);
+  });
+  const strokeOutput = app.querySelector("[data-tv-stroke]");
+  if (strokeOutput) strokeOutput.textContent = state.strokeScore;
   app.querySelectorAll("[data-player-name]").forEach((element) => {
     element.textContent = state.names[Number(element.dataset.playerName)] || `Jogador ${Number(element.dataset.playerName) + 1}`;
   });
@@ -236,7 +483,7 @@ function finishFrame(app) {
   });
 }
 
-function openNamesModal(app) {
+function openNamesModal(app, renderAfterSave = renderPlacar) {
   openModal(app, `<div class="scorekeeper-modal-icon"><i class="bi bi-people-fill"></i></div>
     <h2>Nome dos jogadores</h2>
     <p>Os nomes ficam salvos somente neste dispositivo.</p>
@@ -249,7 +496,7 @@ function openNamesModal(app) {
       state.names = [0, 1].map((index) => modal.querySelector(`[data-name-input="${index}"]`).value.trim() || `Jogador ${index + 1}`);
       saveState();
       closeModal(app);
-      renderPlacar();
+      renderAfterSave();
     });
   }, Boolean(state.names[0] && state.names[1]));
 }
@@ -309,10 +556,12 @@ function loadState() {
         points: [validNumber(saved.points[0]), validNumber(saved.points[1])],
         wins: [validNumber(saved.wins[0]), validNumber(saved.wins[1])],
         history: Array.isArray(saved.history) ? saved.history : [],
+        breakPlayer: Number(saved.breakPlayer) === 1 ? 1 : 0,
+        strokeScore: validNumber(saved.strokeScore),
       };
     }
   } catch {}
-  return { names: ["", ""], points: [0, 0], wins: [0, 0], history: [] };
+  return { names: ["", ""], points: [0, 0], wins: [0, 0], history: [], breakPlayer: 0, strokeScore: 0 };
 }
 
 function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }

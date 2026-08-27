@@ -28,6 +28,14 @@ Todos esses dados são auxiliares e locais ao navegador. O placar não registra
 resultados oficiais, não autentica usuários e não escreve nos backends PHP ou
 Apps Script.
 
+### Modo TV
+
+A rota direta `/placar/tv` apresenta somente os dois jogadores, seus pontos, o
+tacada ativa, os pontos da tacada, a diferença e o número de partidas em um quadro widescreen. Ela não exibe
+botões de pontuação, ferramentas, rodapé ou acesso administrativo. O controle é
+feito pelo teclado numérico e a tecla `/` abre a legenda completa. O modo TV
+compartilha o estado local e o bloqueio de tela do placar comum.
+
 ## Conceitos
 
 - **Jogador:** cadastro global, independente de ano e divisão.

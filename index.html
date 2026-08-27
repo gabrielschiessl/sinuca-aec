@@ -24,6 +24,10 @@
           ? ""
           : "/sinuca-aec";
 
+      const baseElement = document.createElement("base");
+      baseElement.href = `${basePath || ""}/`;
+      document.head.appendChild(baseElement);
+
       if (restoredRoute) {
         routeParams.delete("route");
         const remainingQuery = routeParams.toString();

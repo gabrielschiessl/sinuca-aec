@@ -53,6 +53,7 @@ caso declarar a limitação e validar em QAS/servidor antes de produção.
 | Histórico | ano padrão, A/B ausente, filtros sticky; dica lateral sempre em Resultados e na Classificação somente <= 388 px; tabelas arrastáveis com mouse |
 | Ranking | 5 anos, 30 posições, empate, W.O. direto, header sticky; dica lateral fixa no card somente em touch <= 907 px; tabela arrastável com mouse |
 | Placar | rota direta sem botão nos menus; nomes; pontos 1–7; penalidade; diferença; reinício; finalização da partida e do jogo; histórico e persistência local; SVGs; Wake Lock ativo, retorno do segundo plano e fallback sem suporte; 760, 600, 380 e 320 px |
+| Placar TV | rota direta sem menus; layout 16:9; sem administrador ou controles clicáveis; tacada ativa e sua pontuação; falta fora da tacada; teclas 0–9, ponto, *, +, -, Backspace, Enter e /; edição de nomes; ajuda; reset parcial/completo e desfazer; estado compartilhado; Wake Lock |
 | Regra | três tabs, taxa dinâmica, responsividade <= 410 px |
 | Login | autorizado, não autorizado, sessão restaurada, logout; popup no navegador e redirect no PWA/iPhone |
 | Partidas | 2x0, 2x1, ao vivo, data em qualquer dia, salvar tudo; filtros combinados de rodada, jogador e pendentes |
