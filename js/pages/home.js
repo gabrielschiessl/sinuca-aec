@@ -51,6 +51,12 @@ ${renderNavbar()}
       text: "Ranking",
     })}
 
+    ${menuButton({
+      route: "/placar",
+      icon: "bi bi-123",
+      text: "Placar",
+    })}
+
 </div>
   </section>
 

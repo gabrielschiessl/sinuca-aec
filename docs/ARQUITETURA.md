@@ -126,6 +126,18 @@ partidas ficam exclusivamente no `localStorage` do dispositivo, sob a chave
 logos e ícones próprios usam SVGs do projeto atual. A rota `/regra` concentra o
 conteúdo normativo, evitando sua duplicação dentro do marcador.
 
+O modo comum também usa `breakPlayer` e `strokeScore`: um único painel de bolas
+pontua a tacada selecionada, enquanto os cards dos jogadores são somente leitura.
+Somente uma seta rosa reservada à esquerda do nome identifica o jogador ativo,
+sem texto adicional, mudança de alinhamento ou alteração do fundo dos cards. No
+resumo central, a divisória separa `Tacada` de `Diferença`; não há divisória
+entre `Partidas` e o card do segundo jogador.
+Uma nova divisória após o segundo jogador separa os cards da seção de botões
+de pontuação.
+Reiniciar pontos e finalizar partida são ferramentas separadas, ambas protegidas
+pelos modais de confirmação existentes. A referência rápida da regra permanece
+em modal para evitar navegação durante um jogo.
+
 Enquanto o marcador permanece visível, o módulo solicita um bloqueio de tela
 pela Screen Wake Lock API. O bloqueio é solicitado novamente quando o documento
 volta ao primeiro plano e liberado ao navegar para outra rota. A indisponibilidade

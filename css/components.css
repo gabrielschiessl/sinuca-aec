@@ -138,6 +138,18 @@
   justify-self: center;
 }
 
+.menu-button[data-route="/placar"] i {
+  box-sizing: border-box;
+  width: 40px;
+  height: 29px;
+  display: grid;
+  place-items: center;
+  border: 2px solid currentColor;
+  border-radius: 5px;
+  font-size: 26px;
+  line-height: 1;
+}
+
 /* ABAS DO CAMPEONATO */
 
 .tabs {
@@ -716,19 +728,20 @@
 .scorekeeper-kicker { color:var(--tab-accent); font-size:.76rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
 
 .scorekeeper-player {
-  padding:20px;
+  box-sizing:border-box;
+  padding:14px 16px;
   border:1px solid var(--border);
-  border-radius:14px;
-  background:var(--group-bg);
+  border-radius:11px;
+  background:var(--surface-darkest);
+  transition:border-color var(--transition),background var(--transition),box-shadow var(--transition);
 }
-
-.scorekeeper-player-header { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-bottom:18px; }
-.scorekeeper-player-header > label { min-width:0; overflow-wrap:anywhere; color:white; font-size:1.18rem; font-weight:800; }
-.scorekeeper-points-field { flex:0 0 auto; display:grid; grid-template-columns:42px 82px 42px; overflow:hidden; border:1px solid var(--border-highlight); border-radius:11px; background:var(--surface-darkest); }
-.scorekeeper-points-field button { display:grid; place-items:center; min-height:48px; padding:0; border:0; background:transparent; color:var(--text-muted); font-size:1.15rem; cursor:pointer; }
-.scorekeeper-points-field button:hover { color:white; background:rgba(255,255,255,.05); }
-.scorekeeper-points-field input { min-width:0; width:100%; padding:6px; border:0; border-right:1px solid var(--border); border-left:1px solid var(--border); outline:0; background:transparent; color:white; font:800 1.5rem/1 "Poppins",sans-serif; text-align:center; appearance:textfield; }
-.scorekeeper-points-field input::-webkit-inner-spin-button { appearance:none; }
+.scorekeeper-player.is-active { border-color:var(--tab-accent); box-shadow:0 0 0 2px rgba(171,41,89,.09); }
+.scorekeeper-player-turn { display:grid; place-items:center; width:18px; color:transparent; font-size:1rem; font-weight:900; }
+.scorekeeper-player.is-active .scorekeeper-player-turn { color:var(--tab-accent); }
+.scorekeeper-player-score { display:grid; grid-template-columns:18px minmax(0,1fr) auto; align-items:center; gap:10px; }
+.scorekeeper-player-score h2 { min-width:0; margin:0; overflow-wrap:anywhere; color:white; font-size:clamp(1.15rem,4vw,1.55rem); }
+.scorekeeper-player.is-active .scorekeeper-player-score h2 { color:var(--tab-accent); }
+.scorekeeper-player-score > strong { flex:0 0 auto; min-width:82px; color:white; font-size:clamp(2.8rem,10vw,4.8rem); font-weight:900; line-height:1; text-align:right; font-variant-numeric:tabular-nums; }
 
 .scorekeeper-balls { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
 .scorekeeper-ball-button { min-width:0; min-height:64px; display:flex; align-items:center; justify-content:center; gap:9px; padding:10px; border:1px solid var(--border); border-radius:11px; background:var(--surface-darkest); color:white; font:700 1rem "Poppins",sans-serif; cursor:pointer; transition:transform var(--transition),border-color var(--transition),background var(--transition); }
@@ -737,12 +750,15 @@
 .scorekeeper-ball-button:active { transform:scale(.97); }
 .scorekeeper-penalty-button i { display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:#f1edee; color:var(--surface-black); font-size:1.05rem; }
 
-.scorekeeper-summary { margin:18px 0; padding:20px; border:1px solid var(--border-highlight); border-radius:14px; background:var(--surface-darkest); }
+.scorekeeper-summary { display:grid; gap:14px; margin:0; padding:20px 4px; background:transparent; }
+.scorekeeper-stroke,.scorekeeper-difference { display:flex; align-items:center; justify-content:space-between; gap:18px; color:var(--text-muted); }
+.scorekeeper-stroke { padding-bottom:14px; border-bottom:1px solid var(--border); }
+.scorekeeper-stroke strong { display:grid; place-items:center; min-width:70px; min-height:48px; padding:5px 12px; border:1px solid var(--border-highlight); border-radius:10px; background:var(--surface-darkest); color:white; font-size:1.55rem; font-variant-numeric:tabular-nums; }
 .scorekeeper-difference { display:flex; align-items:center; justify-content:space-between; gap:18px; color:var(--text-muted); }
 .scorekeeper-difference strong { color:white; font-size:1.05rem; text-align:right; }
 .scorekeeper-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:18px 0; }
 .scorekeeper-actions .btn { width:100%; min-height:48px; }
-.scorekeeper-match-score { display:flex; align-items:center; justify-content:center; gap:14px; padding-top:17px; border-top:1px solid var(--border); color:var(--text-muted); }
+.scorekeeper-match-score { display:flex; align-items:center; justify-content:center; gap:14px; padding-top:14px; border-top:1px solid var(--border); color:var(--text-muted); }
 .scorekeeper-match-score span { margin-right:4px; font-weight:600; }
 .scorekeeper-match-score strong { display:grid; place-items:center; min-width:48px; height:48px; border:1px solid var(--border); border-radius:10px; background:var(--panel-bg); color:white; font-size:1.35rem; }
 .scorekeeper-match-score i { color:var(--text-muted); font-style:normal; font-weight:800; }
@@ -754,8 +770,16 @@
 .scorekeeper-reference-row div { min-width:0; display:flex; flex-direction:column; gap:2px; }
 .scorekeeper-reference-row strong { color:white; font-size:.9rem; }
 .scorekeeper-reference-row span { color:var(--text-muted); font-size:.72rem; line-height:1.45; }
+.scorekeeper-rule-reference { margin-top:18px; text-align:left; }
+.scorekeeper-rule-reference h3 { margin:0 0 10px; color:white; font-size:1rem; }
 
-.scorekeeper-tools { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:20px; }
+.scorekeeper-scoring { margin-top:20px; padding:20px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+.scorekeeper-switch-turn { width:100%; min-height:52px; display:flex; align-items:center; justify-content:center; gap:10px; margin-top:12px; border:1px solid var(--border-highlight); border-radius:11px; background:var(--surface-darkest); color:white; font:700 .88rem "Poppins",sans-serif; cursor:pointer; transition:background var(--transition),border-color var(--transition),transform var(--transition); }
+.scorekeeper-switch-turn i { color:var(--tab-accent); font-size:1.2rem; }
+.scorekeeper-switch-turn:hover { border-color:var(--tab-accent); background:var(--accent); }
+.scorekeeper-switch-turn:active { transform:scale(.985); }
+
+.scorekeeper-tools { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; margin-top:20px; }
 .scorekeeper-tool { min-width:0; min-height:76px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; padding:10px 6px; border:1px solid var(--border); border-radius:11px; background:var(--surface-darkest); color:var(--text-primary); font:600 .76rem "Poppins",sans-serif; cursor:pointer; transition:border-color var(--transition),background var(--transition); }
 .scorekeeper-tool i { color:var(--tab-accent); font-size:1.2rem; }
 .scorekeeper-tool:hover { border-color:var(--border-highlight); background:var(--accent); }
@@ -926,6 +950,7 @@
 }
 .scorekeeper-tv-match-score i { color:var(--text-muted); font-size:clamp(1.35rem,2vw,2.2rem); font-style:normal; font-weight:900; }
 .scorekeeper-tv-help-hint { margin:clamp(18px,2.5vw,32px) 0 0; color:var(--text-muted); font-size:clamp(.82rem,1.2vw,1rem); text-align:center; }
+.scorekeeper-tv-copyright { position:fixed; z-index:2; left:50%; bottom:7px; color:var(--text-muted); font-size:clamp(.58rem,.8vw,.72rem); line-height:1; white-space:nowrap; transform:translateX(-50%); pointer-events:none; }
 .scorekeeper-tv-page kbd,
 .scorekeeper-modal kbd { display:inline-grid; place-items:center; min-width:28px; min-height:27px; padding:2px 7px; border:1px solid var(--border-highlight); border-radius:6px; background:var(--surface-darkest); color:white; font:700 .82rem "Poppins",sans-serif; box-shadow:inset 0 -2px rgba(255,255,255,.05); }
 .scorekeeper-tv-key-list { margin:22px 0 0; }
@@ -962,9 +987,7 @@
   .scorekeeper-shell { padding:16px; border-radius:13px; }
   .scorekeeper-heading { margin-bottom:18px; }
   .scorekeeper-heading p { font-size:.86rem; }
-  .scorekeeper-player { padding:14px; }
-  .scorekeeper-player-header { align-items:flex-start; flex-direction:column; gap:10px; }
-  .scorekeeper-points-field { width:100%; grid-template-columns:46px 1fr 46px; }
+  .scorekeeper-player { padding:12px 14px; }
   .scorekeeper-balls { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .scorekeeper-actions { grid-template-columns:1fr; }
   .scorekeeper-tools { grid-template-columns:1fr 1fr; }

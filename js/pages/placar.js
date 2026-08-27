@@ -1,6 +1,7 @@
 import { renderNavbar } from "../components/navbar.js";
 import { renderFooter } from "../components/footer.js";
 import { withBasePath } from "../config.js";
+import { navigate, resetPageScroll } from "../router.js";
 
 const STORAGE_KEY = "aec_sinuca_placar";
 const BALLS = [
@@ -26,32 +27,19 @@ export function renderPlacar() {
   cleanupTvKeyboard();
   const app = document.getElementById("app");
   app.innerHTML = `
-    ${renderNavbar({ title: "Placar" })}
+    ${renderNavbar({ title: "Placar", hideAdmin: true })}
     <main class="scorekeeper-page">
       <section class="scorekeeper-shell" aria-labelledby="scorekeeper-title">
-        <header class="scorekeeper-heading">
-          <span class="scorekeeper-kicker"><i class="bi bi-calculator"></i> Regra Brasileira</span>
-          <h1 id="scorekeeper-title">Placar de mesa</h1>
-          <p>Marque os pontos de cada partida e acompanhe o resultado do jogo.</p>
-        </header>
-
-        <div class="scorekeeper-player" data-player="0">
-          ${playerHeader(0)}
-          ${pointButtons(0)}
-        </div>
+        ${scorekeeperPlayer(0)}
 
         <section class="scorekeeper-summary" aria-label="Resumo do jogo">
+          <div class="scorekeeper-stroke">
+            <span>Tacada</span>
+            <strong data-tv-stroke>${state.strokeScore}</strong>
+          </div>
           <div class="scorekeeper-difference">
             <span>Diferença</span>
             <strong data-difference></strong>
-          </div>
-          <div class="scorekeeper-actions">
-            <button class="btn btn-outline" type="button" data-reset-frame>
-              <i class="bi bi-arrow-counterclockwise"></i> Reiniciar pontos
-            </button>
-            <button class="btn btn-primary" type="button" data-finish-frame>
-              <i class="bi bi-flag-fill"></i> Finalizar partida
-            </button>
           </div>
           <div class="scorekeeper-match-score">
             <span>Partidas</span>
@@ -61,23 +49,23 @@ export function renderPlacar() {
           </div>
         </section>
 
-        <div class="scorekeeper-player" data-player="1">
-          ${playerHeader(1)}
-          ${pointButtons(1)}
-        </div>
+        ${scorekeeperPlayer(1)}
 
-        <section class="scorekeeper-reference">
-          <h2>Diferenças máximas</h2>
-          ${maximumDifference("azul.svg", "Azul", "46 pontos", "Preta (N) → Azul (V) → Preta (L) → Preta (N) → Rosa (V) → Preta (L) → Preta (V)")}
-          ${maximumDifference("rosa.svg", "Rosa", "27 pontos", "Preta (N) → Rosa (V) → Preta (L) → Preta (V)")}
-          ${maximumDifference("preta.svg", "Preta", "7 pontos", "Preta (V)")}
+        <section class="scorekeeper-scoring" aria-label="Pontuação da tacada">
+          ${pointButtons()}
+          <button class="scorekeeper-switch-turn" type="button" data-switch-turn>
+            <i class="bi bi-arrow-left-right"></i>
+            <span>Trocar tacada</span>
+          </button>
         </section>
 
         <nav class="scorekeeper-tools" aria-label="Ferramentas do placar">
           <button class="scorekeeper-tool" type="button" data-show-balls><i class="bi bi-circle-fill"></i><span>Bolas e mesa</span></button>
-          <button class="scorekeeper-tool" type="button" data-route="/regra"><i class="bi bi-journal-text"></i><span>Regra</span></button>
           <button class="scorekeeper-tool" type="button" data-edit-names><i class="bi bi-person-gear"></i><span>Editar nomes</span></button>
+          <button class="scorekeeper-tool" type="button" data-reset-frame><i class="bi bi-arrow-counterclockwise"></i><span>Reiniciar pontos</span></button>
+          <button class="scorekeeper-tool" type="button" data-finish-frame><i class="bi bi-flag-fill"></i><span>Finalizar partida</span></button>
           <button class="scorekeeper-tool" type="button" data-finish-match><i class="bi bi-trophy-fill"></i><span>Finalizar jogo</span></button>
+          <button class="scorekeeper-tool" type="button" data-tv-mode><i class="bi bi-tv-fill"></i><span>Modo TV</span></button>
         </nav>
       </section>
       ${renderFooter("footer-light")}
@@ -87,7 +75,7 @@ export function renderPlacar() {
   bindEvents(app);
   renderState(app);
   setupScreenWakeLock(app);
-  if (!state.names[0] || !state.names[1]) openNamesModal(app);
+  if (!state.names[0] || !state.names[1]) openNamesModal(app, renderPlacar, true);
 }
 
 export function renderPlacarTv() {
@@ -121,6 +109,7 @@ export function renderPlacarTv() {
 
         <p class="scorekeeper-tv-help-hint"><kbd>/</kbd> Ver botões e ações</p>
       </section>
+      <small class="scorekeeper-tv-copyright">© 2026 Gabriel Schiessl</small>
     </main>
     <div data-scorekeeper-modal></div>`;
 
@@ -382,23 +371,22 @@ function cleanupScreenWakeLock() {
   if (sentinel) sentinel.release().catch(() => {});
 }
 
-function playerHeader(index) {
-  return `<div class="scorekeeper-player-header">
-    <label for="scorekeeper-points-${index}" data-player-name="${index}">${escapeHtml(state.names[index] || `Jogador ${index + 1}`)}</label>
-    <div class="scorekeeper-points-field">
-      <button type="button" data-subtract-point="${index}" aria-label="Retirar um ponto de ${escapeHtml(state.names[index] || `Jogador ${index + 1}`)}"><i class="bi bi-dash-lg"></i></button>
-      <input id="scorekeeper-points-${index}" type="number" inputmode="numeric" min="0" value="${state.points[index]}" data-points="${index}" aria-label="Pontos de ${escapeHtml(state.names[index] || `Jogador ${index + 1}`)}">
-      <button type="button" data-add-point="${index}" aria-label="Adicionar um ponto a ${escapeHtml(state.names[index] || `Jogador ${index + 1}`)}"><i class="bi bi-plus-lg"></i></button>
+function scorekeeperPlayer(index) {
+  return `<article class="scorekeeper-player" data-player="${index}">
+    <div class="scorekeeper-player-score">
+      <span class="scorekeeper-player-turn" aria-hidden="true"><i class="bi bi-play-fill"></i></span>
+      <h2 data-player-name="${index}">${escapeHtml(state.names[index] || `Jogador ${index + 1}`)}</h2>
+      <strong data-player-points="${index}">${state.points[index]}</strong>
     </div>
-  </div>`;
+  </article>`;
 }
 
-function pointButtons(player) {
+function pointButtons() {
   return `<div class="scorekeeper-balls">
-    ${BALLS.map((ball) => `<button type="button" class="scorekeeper-ball-button" data-score-player="${player}" data-score-points="${ball.points}" aria-label="Adicionar ${ball.points} ${ball.points === 1 ? "ponto" : "pontos"} pela bola ${ball.name.toLowerCase()}">
+    ${BALLS.map((ball) => `<button type="button" class="scorekeeper-ball-button" data-score-points="${ball.points}" aria-label="Adicionar ${ball.points} ${ball.points === 1 ? "ponto" : "pontos"} pela bola ${ball.name.toLowerCase()}">
       <span>+${ball.points}</span><img src="${ballAsset(ball.image)}" alt="">
     </button>`).join("")}
-    <button type="button" class="scorekeeper-ball-button scorekeeper-penalty-button" data-score-player="${player}" data-score-points="7" aria-label="Adicionar sete pontos de penalidade">
+    <button type="button" class="scorekeeper-ball-button scorekeeper-penalty-button" data-score-penalty aria-label="Marcar falta de sete pontos">
       <span>+7</span><i class="bi bi-x-lg"></i>
     </button>
   </div>`;
@@ -412,36 +400,48 @@ function maximumDifference(image, name, points, sequence) {
 }
 
 function bindEvents(app) {
-  app.querySelectorAll("[data-score-player]").forEach((button) => button.addEventListener("click", () => {
-    changePoints(Number(button.dataset.scorePlayer), Number(button.dataset.scorePoints), app);
+  app.querySelectorAll("[data-score-points]").forEach((button) => button.addEventListener("click", () => {
+    addStrokePoints(Number(button.dataset.scorePoints), app);
   }));
-  app.querySelectorAll("[data-add-point]").forEach((button) => button.addEventListener("click", () => changePoints(Number(button.dataset.addPoint), 1, app)));
-  app.querySelectorAll("[data-subtract-point]").forEach((button) => button.addEventListener("click", () => changePoints(Number(button.dataset.subtractPoint), -1, app)));
-  app.querySelectorAll("[data-points]").forEach((input) => input.addEventListener("input", () => {
-    state.points[Number(input.dataset.points)] = Math.max(0, Number.parseInt(input.value, 10) || 0);
+  app.querySelector("[data-score-penalty]")?.addEventListener("click", () => {
+    const beneficiary = state.breakPlayer === 0 ? 1 : 0;
+    state.points[beneficiary] += 7;
+    state.breakPlayer = beneficiary;
+    state.strokeScore = 0;
     saveState();
     renderState(app);
-  }));
+  });
+  app.querySelector("[data-switch-turn]")?.addEventListener("click", () => switchTurn(app));
+  app.querySelector("[data-edit-names]")?.addEventListener("click", () => openNamesModal(app));
+  app.querySelector("[data-show-balls]")?.addEventListener("click", () => openBallsModal(app));
+  app.querySelector("[data-tv-mode]")?.addEventListener("click", () => navigate("/placar/tv"));
   app.querySelector("[data-reset-frame]")?.addEventListener("click", () => confirmAction(app, "Reiniciar os pontos?", "Os pontos da partida atual voltarão para zero.", () => {
     state.points = [0, 0];
+    state.strokeScore = 0;
     saveState();
     renderState(app);
   }));
   app.querySelector("[data-finish-frame]")?.addEventListener("click", () => finishFrame(app));
-  app.querySelector("[data-edit-names]")?.addEventListener("click", () => openNamesModal(app));
-  app.querySelector("[data-show-balls]")?.addEventListener("click", () => openBallsModal(app));
   app.querySelector("[data-finish-match]")?.addEventListener("click", () => openResultModal(app));
 }
 
-function changePoints(player, amount, app) {
-  state.points[player] = Math.max(0, state.points[player] + amount);
+function addStrokePoints(amount, app) {
+  state.points[state.breakPlayer] += amount;
+  state.strokeScore += amount;
+  saveState();
+  renderState(app);
+}
+
+function switchTurn(app) {
+  state.breakPlayer = state.breakPlayer === 0 ? 1 : 0;
+  state.strokeScore = 0;
   saveState();
   renderState(app);
 }
 
 function renderState(app) {
-  app.querySelectorAll("[data-points]").forEach((input) => {
-    input.value = state.points[Number(input.dataset.points)];
+  app.querySelectorAll("[data-player-points]").forEach((element) => {
+    element.textContent = state.points[Number(element.dataset.playerPoints)];
   });
   app.querySelectorAll("[data-wins]").forEach((element) => {
     element.textContent = state.wins[Number(element.dataset.wins)];
@@ -456,6 +456,9 @@ function renderState(app) {
   if (strokeOutput) strokeOutput.textContent = state.strokeScore;
   app.querySelectorAll("[data-player-name]").forEach((element) => {
     element.textContent = state.names[Number(element.dataset.playerName)] || `Jogador ${Number(element.dataset.playerName) + 1}`;
+  });
+  app.querySelectorAll("[data-player]").forEach((element) => {
+    element.classList.toggle("is-active", Number(element.dataset.player) === state.breakPlayer);
   });
   const difference = Math.abs(state.points[0] - state.points[1]);
   const leader = state.points[0] === state.points[1]
@@ -478,12 +481,13 @@ function finishFrame(app) {
     state.wins[winner] += 1;
     state.history.push({ date: new Date().toISOString(), points: [first, second], winner });
     state.points = [0, 0];
+    state.strokeScore = 0;
     saveState();
     renderState(app);
   });
 }
 
-function openNamesModal(app, renderAfterSave = renderPlacar) {
+function openNamesModal(app, renderAfterSave = renderPlacar, resetOnClose = false) {
   openModal(app, `<div class="scorekeeper-modal-icon"><i class="bi bi-people-fill"></i></div>
     <h2>Nome dos jogadores</h2>
     <p>Os nomes ficam salvos somente neste dispositivo.</p>
@@ -492,20 +496,31 @@ function openNamesModal(app, renderAfterSave = renderPlacar) {
       <label>Jogador 2<input type="text" maxlength="40" value="${escapeHtml(state.names[1])}" data-name-input="1" placeholder="Jogador 2"></label>
     </div>
     <div class="scorekeeper-modal-actions"><button class="btn btn-outline" type="button" data-modal-close>Cancelar</button><button class="btn btn-primary" type="button" data-save-names>Confirmar</button></div>`, (modal) => {
+    if (resetOnClose) {
+      modal.querySelector("[data-modal-close]")?.addEventListener("click", resetPageScroll);
+    }
     modal.querySelector("[data-save-names]").addEventListener("click", () => {
       state.names = [0, 1].map((index) => modal.querySelector(`[data-name-input="${index}"]`).value.trim() || `Jogador ${index + 1}`);
       saveState();
       closeModal(app);
       renderAfterSave();
+      if (resetOnClose) resetPageScroll();
     });
   }, Boolean(state.names[0] && state.names[1]));
 }
 
 function openBallsModal(app) {
   openModal(app, `<div class="scorekeeper-modal-icon"><i class="bi bi-circle-fill"></i></div><h2>Bolas e mesa</h2>
+    <p>As bolas valem de 1 a 7 pontos. Use a penalidade para creditar 7 pontos ao adversário e transferir a tacada.</p>
     <div class="scorekeeper-ball-legend">${[{ points: 0, name: "Tacadeira", image: "branca.svg" }, ...BALLS].map((ball) => `<div><img src="${ballAsset(ball.image)}" alt=""><span>${ball.name}</span><strong>${ball.points ? `${ball.points} ${ball.points === 1 ? "ponto" : "pontos"}` : "Branca"}</strong></div>`).join("")}</div>
     <img class="scorekeeper-table-map" src="${ballAsset("mapa-regra-brasileira.svg")}" alt="Mapa da mesa da Regra Brasileira">
     <p class="scorekeeper-table-size">Medidas da mesa nacional: 3,10 m × 1,70 m</p>
+    <div class="scorekeeper-reference scorekeeper-rule-reference">
+      <h3>Diferenças máximas</h3>
+      ${maximumDifference("azul.svg", "Azul", "46 pontos", "Preta (N) → Azul (V) → Preta (L) → Preta (N) → Rosa (V) → Preta (L) → Preta (V)")}
+      ${maximumDifference("rosa.svg", "Rosa", "27 pontos", "Preta (N) → Rosa (V) → Preta (L) → Preta (V)")}
+      ${maximumDifference("preta.svg", "Preta", "7 pontos", "Preta (V)")}
+    </div>
     <div class="scorekeeper-modal-actions"><button class="btn btn-primary" type="button" data-modal-close>Entendi</button></div>`);
 }
 
@@ -518,6 +533,7 @@ function openResultModal(app) {
     <div class="scorekeeper-modal-actions"><button class="btn btn-outline" type="button" data-modal-close>Voltar</button><button class="btn btn-primary" type="button" data-clear-match>Encerrar jogo</button></div>`, (modal) => {
     modal.querySelector("[data-clear-match]").addEventListener("click", () => confirmAction(app, "Encerrar e limpar o jogo?", "O placar e todo o histórico de partidas serão apagados.", () => {
       state.points = [0, 0]; state.wins = [0, 0]; state.history = [];
+      state.breakPlayer = 0; state.strokeScore = 0;
       saveState(); closeModal(app); renderPlacar();
     }));
   });

@@ -11,8 +11,8 @@
 
 ## Placar de mesa
 
-A rota direta `/placar` oferece um marcador auxiliar da Regra Brasileira, sem
-botão de acesso na Home, navbar ou demais páginas nesta etapa. Ela permite:
+A rota `/placar`, acessível pelo último botão da Home, oferece um marcador
+auxiliar da Regra Brasileira. Ela permite:
 
 - definir dois nomes;
 - somar de 1 a 7 pontos pelas bolas ou 7 pontos de penalidade;
@@ -22,7 +22,15 @@ botão de acesso na Home, navbar ou demais páginas nesta etapa. Ela permite:
 - reiniciar a partida ou encerrar e limpar o jogo;
 - manter a tela ativa enquanto o placar estiver visível, quando permitido pelo
   navegador e pelo sistema operacional;
-- consultar bolas, mapa da mesa e abrir a página completa de Regra.
+- consultar no mesmo modal a regra rápida, as bolas, o mapa da mesa e as
+  diferenças máximas.
+
+No modo comum, há um único conjunto de bolas para pontuar o jogador cuja tacada
+está destacada. A troca de tacada é explícita; a falta credita sete pontos ao
+adversário e transfere a tacada. Reiniciar e finalizar a partida são ferramentas
+separadas com confirmação. O botão `Bolas e mesa` concentra toda a referência
+rápida sem abandonar o placar; o último botão, `Modo TV`, abre `/placar/tv`. A
+navbar desta rota não oferece acesso administrativo.
 
 Todos esses dados são auxiliares e locais ao navegador. O placar não registra
 resultados oficiais, não autentica usuários e não escreve nos backends PHP ou
@@ -35,6 +43,8 @@ tacada ativa, os pontos da tacada, a diferença e o número de partidas em um qu
 botões de pontuação, ferramentas, rodapé ou acesso administrativo. O controle é
 feito pelo teclado numérico e a tecla `/` abre a legenda completa. O modo TV
 compartilha o estado local e o bloqueio de tela do placar comum.
+O crédito `© 2026 Gabriel Schiessl` fica sobreposto no rodapé, sem alterar as
+dimensões do quadro widescreen.
 
 ## Conceitos
 
