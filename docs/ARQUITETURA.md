@@ -118,7 +118,7 @@ scroll em navegadores móveis.
 
 ### Placar de mesa
 
-`/placar` é uma rota funcional deliberadamente ausente dos menus. O módulo
+`/placar` é uma rota funcional acessível pelo último botão da Home. O módulo
 `js/pages/placar.js` adapta o marcador do projeto legado RegraBrasileira ao
 design e à infraestrutura desta SPA. Pontos, nomes, vitórias e histórico das
 partidas ficam exclusivamente no `localStorage` do dispositivo, sob a chave
@@ -169,6 +169,14 @@ continuam resolvidos a partir da raiz local ou de `/sinuca-aec/` depois que a
 rota é restaurada pela query string.
 
 ## API PHP
+
+As salas de placar são uma exceção autorizada à paridade PHP/Apps Script.
+O endpoint separado `api/placar.php` usa `ScoreboardRoomService` (salas, limites,
+transferência e transações) e `ScoreboardState` (validação do estado).
+`js/scoreboardRooms.js` serializa escritas, recupera comandos pendentes e consulta
+alterações; `js/pages/placar.js` integra criação, visualização e transferência.
+Status online confirmado; integração entre aparelhos aguarda validação. Consulte
+`PLACAR_COMPARTILHADO.md`.
 
 `api/index.php` é um front controller:
 

@@ -29,7 +29,43 @@ Executar `php -l` em `api/index.php` e todos os arquivos de `api/src` em um
 ambiente com PHP. A máquina de desenvolvimento pode não possuir PHP local; nesse
 caso declarar a limitação e validar em QAS/servidor antes de produção.
 
-### SQL
+### Salas do placar — testes adicionados
+
+- `node tests/scoreboard-client.mjs`: passou em 27/08/2026. Transporte simulado:
+  serialização, resposta perdida, recuperação após recarga, retry imutável,
+  revogação, TV somente leitura, conflito, expiração e isolamento do storage local.
+- Cliente também testa desfazer após resposta perdida/recarga, bloqueio durante
+  confirmação e histórico vazio. PHP testa PIN com zero inicial, rejeição de
+  não numéricos, código numérico e reutilização condicional de sala expirada.
+  Testar no servidor uma reutilização concorrente e troca de controle durante
+  expiração; PHP/MySQL ainda indisponíveis localmente para executar a suíte.
+- Interface local conferida no navegador: abertura do modal e dimensões mobile.
+  Botão Desfazer validado em 7 → 5 → 0, desabilitado ao acabar o histórico;
+  campo de PIN conferido com inputmode numérico.
+  Safari/iPhone, TV real e integração PHP/MySQL ainda precisam de validação.
+- Teste manual: criar pelo telefone, abrir Link da TV, somar pontos e trocar
+  tacada; na TV em sala, confirmar ausência da legenda de atalhos, `/` sem
+  efeito, logo sem navegação e somente controles da sala disponíveis;
+  conferir identificadores ampliados em 1280×720 e 1920×1080. Depois trocar
+  tacada; assumir com senha em outro telefone; o anterior deve ser bloqueado.
+  Desligar/religar rede durante escrita e recarregar sem duplicar pontos.
+  Criar segunda sala, verificar isolamento, sair e conferir placar local anterior.
+
+- `php tests/scoreboard-state.php`: validação pura, sem acesso a banco.
+- `php tests/scoreboard-rooms.php`: integração somente em banco descartável com
+  001 + 005 + 006. A variável `AEC_SCOREBOARD_TEST_CONFIG` deve apontar para um
+  PHP privado retornando `database` e `scoreboard_test_database => true`.
+  Nunca apontar para produção. O teste cria duas salas e remove somente essas
+  salas e seus buckets individuais; buckets globais de limite permanecem.
+- Casos: transferência, token revogado, senha errada, consulta sem segredos,
+  comandos repetidos, conflitos, isolamento, encerramento, expiração e limites.
+- Esses testes ainda não foram executados nesta etapa por ausência de PHP/MySQL
+  local. Rodar também `php -l` nos três arquivos novos antes do teste integrado.
+- Testar concorrência real no servidor: duas escritas na mesma versão (somente
+  uma deve vencer) e transferência durante escrita (token antigo deve ser
+  recusado após a transferência). O teste CLI sequencial não cobre essa corrida.
+
+### Verificações SQL
 
 - importar em banco descartável/QAS;
 - conferir `schema_migrations`;

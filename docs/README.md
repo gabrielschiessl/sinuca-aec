@@ -21,6 +21,7 @@ Referências específicas:
 
 - [Configuração do login Google](CONFIGURACAO_LOGIN_GOOGLE.md)
 - [Instalação do banco](../database/README.md)
+- [Placar compartilhado por salas — implementação em etapas](PLACAR_COMPARTILHADO.md)
 
 ## Regra de manutenção
 

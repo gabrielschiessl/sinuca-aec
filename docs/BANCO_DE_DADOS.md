@@ -142,9 +142,23 @@ Histórico das versões SQL aplicadas.
 
 ## Instalação e migrações
 
+### Salas auxiliares de placar
+
+A migração `005_scoreboard_rooms.sql` cria `scoreboard_rooms`, sem vínculos com
+o campeonato. Guarda código de visualização, hash da chave de controle, estado
+JSON, versão, último comando e datas de validade/encerramento. A migração 006
+adiciona hash da senha de transferência e `scoreboard_rate_limits` (buckets
+de limites por hash, janela, tentativas e expiração, sem IP em texto puro).
+API implementada em `api/placar.php` e interface integrada. Status online
+confirmado pelo usuário; operações ainda precisam de teste entre aparelhos.
+O VARCHAR(12) comporta os novos códigos numéricos de 6 dígitos, sem migração
+adicional. Ao reutilizar código expirado, um UPDATE condicional troca estado,
+senha e token e incrementa a versão; não apaga/recria a linha nem reseta a versão.
+Detalhes em `PLACAR_COMPARTILHADO.md`.
+
 `001_initial_schema.sql` é um snapshot consolidado e já contém `scheduled_date`,
 `scheduled_time`, índice não único de participante e `direct_wo`. Em banco novo,
-importe somente 001.
+importe 001 e depois 005 e 006 para incluir a estrutura de salas.
 
 Os arquivos 002–004 atualizam instalações antigas:
 

@@ -790,7 +790,13 @@
 .scorekeeper-modal > p { margin:0 auto 20px; color:var(--text-muted); line-height:1.55; }
 .scorekeeper-modal-icon { display:grid; place-items:center; width:54px; height:54px; margin:0 auto; border-radius:50%; background:rgba(171,41,89,.14); color:var(--tab-accent); font-size:1.55rem; }
 .scorekeeper-modal-icon.is-warning { color:#d75378; }
-.scorekeeper-modal-actions { display:flex; justify-content:center; gap:10px; margin-top:22px; }
+.scorekeeper-modal-actions { display:flex; justify-content:center; gap:10px; margin-top:22px; flex-wrap:wrap; }
+.scorekeeper-room-bar { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px 16px; margin-bottom:16px; color:var(--text-muted); font-size:.85rem; text-align:center; }
+.scorekeeper-room-bar > div { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
+.scorekeeper-room-bar button { border:1px solid var(--border-highlight); border-radius:8px; background:var(--surface-darkest); color:white; padding:8px 12px; font:inherit; cursor:pointer; }
+.scorekeeper-room-bar strong { color:white; overflow-wrap:anywhere; }
+.scorekeeper-room-bar button:disabled, .scorekeeper-shell button:disabled { opacity:.45; cursor:not-allowed; }
+.scorekeeper-name-fields input { min-width:0; max-width:100%; box-sizing:border-box; font-size:16px; }
 .scorekeeper-modal-actions .btn { min-width:130px; }
 .scorekeeper-name-fields { display:grid; gap:13px; margin-top:20px; text-align:left; }
 .scorekeeper-name-fields label { display:grid; gap:6px; color:var(--text-muted); font-size:.75rem; font-weight:600; }
@@ -840,6 +846,7 @@
 }
 
 .scorekeeper-tv-player {
+  --tv-player-name-size:clamp(1.8rem,3.5vw,4.1rem);
   min-width:0;
   min-height:clamp(370px,60vh,680px);
   display:flex;
@@ -867,9 +874,9 @@
   gap:6px;
   margin-bottom:clamp(12px,2vh,24px);
   color:transparent;
-  font-size:clamp(.78rem,1.2vw,1rem);
+  font-size:calc(var(--tv-player-name-size) * .8);
   font-weight:800;
-  letter-spacing:.12em;
+  letter-spacing:.04em;
   text-transform:uppercase;
 }
 
@@ -879,7 +886,7 @@
   margin:0;
   overflow-wrap:anywhere;
   color:white;
-  font-size:clamp(1.8rem,3.5vw,4.1rem);
+  font-size:var(--tv-player-name-size);
   line-height:1.08;
 }
 .scorekeeper-tv-points {
@@ -904,7 +911,7 @@
   display:block;
   margin-bottom:10px;
   color:var(--text-muted);
-  font-size:clamp(.85rem,1.2vw,1.05rem);
+  font-size:clamp(1.05rem,1.9vw,1.8rem);
   font-weight:700;
   letter-spacing:.08em;
   text-transform:uppercase;
@@ -948,7 +955,8 @@
   font-size:clamp(1.7rem,3vw,3.1rem);
   font-variant-numeric:tabular-nums;
 }
-.scorekeeper-tv-match-score i { color:var(--text-muted); font-size:clamp(1.35rem,2vw,2.2rem); font-style:normal; font-weight:900; }
+.scorekeeper-tv-match-score i { color:var(--text-muted); font-size:clamp(1.6rem,2.5vw,2.7rem); font-style:normal; font-weight:900; }
+body:has(.scorekeeper-tv-page.is-room-viewer) .back-to-top { display:none !important; }
 .scorekeeper-tv-help-hint { margin:clamp(18px,2.5vw,32px) 0 0; color:var(--text-muted); font-size:clamp(.82rem,1.2vw,1rem); text-align:center; }
 .scorekeeper-tv-copyright { position:fixed; z-index:2; left:50%; bottom:7px; color:var(--text-muted); font-size:clamp(.58rem,.8vw,.72rem); line-height:1; white-space:nowrap; transform:translateX(-50%); pointer-events:none; }
 .scorekeeper-tv-page kbd,
@@ -970,15 +978,15 @@
   .scorekeeper-tv-shell { padding:12px; border-radius:14px; }
   .scorekeeper-tv-board { grid-template-columns:1fr 110px 1fr; gap:8px; }
   .scorekeeper-tv-player { min-height:260px; border-radius:12px; }
-  .scorekeeper-tv-player h1 { font-size:clamp(1rem,5vw,1.55rem); }
+  .scorekeeper-tv-player { --tv-player-name-size:clamp(1rem,5vw,1.55rem); }
   .scorekeeper-tv-points { font-size:clamp(4rem,18vw,7rem); }
-  .scorekeeper-tv-summary span { font-size:.62rem; }
+  .scorekeeper-tv-summary span { font-size:.8rem; }
   .scorekeeper-tv-difference strong { font-size:clamp(.9rem,3.5vw,1.25rem); }
   .scorekeeper-tv-stroke-score strong { height:52px; border-radius:8px; font-size:1.65rem; }
   .scorekeeper-tv-match-score > div { gap:6px; }
   .scorekeeper-tv-match-score strong { min-width:38px; height:38px; border-radius:8px; font-size:1.15rem; }
-  .scorekeeper-tv-match-score i { font-size:1rem; }
-  .scorekeeper-tv-break { min-height:20px; font-size:.58rem; }
+  .scorekeeper-tv-match-score i { font-size:1.25rem; }
+  .scorekeeper-tv-break { min-height:20px; }
   .scorekeeper-tv-key-list > div { grid-template-columns:92px 1fr; }
 }
 

@@ -42,6 +42,37 @@ Nunca versionar ou enviar credenciais em capturas, logs ou respostas de IA.
 
 ## Requisitos PHP
 
+### Publicação da API de salas (etapa 2)
+
+1. Após backup, aplicar 006 se 005 já está instalada.
+2. Publicar `api/placar.php`, `api/src/ScoreboardRoomService.php` e
+   `api/src/ScoreboardState.php`. Não sobrescrever `config.local.php` com o
+   exemplo: acrescentar somente o bloco abaixo ao array existente.
+3. Habilitar no `api/config.local.php` do servidor:
+
+```php
+'scoreboard_rooms' => [
+    'enabled' => true,
+    'ttl_seconds' => 86400,
+],
+```
+
+4. Abrir `/sinuca-aec/api/placar.php?acao=status`. Esperado: `status: online`,
+   `salas_habilitadas: true`, `banco: mysql`, `validade_segundos: 86400`.
+5. Publicar `js/scoreboardRooms.js`, `js/pages/placar.js`, `css/components.css`
+   e `service-worker.js` juntos. Interface de salas não exige nova migração
+   além de 005 e 006 já previstas. Testar operações em salas descartáveis,
+   seguindo `PLACAR_COMPARTILHADO.md`; não envolve partidas oficiais.
+
+Desativação: `enabled => false` bloqueia somente a API de salas; não altera o
+placar local nem a API dos campeonatos. Não enviar `tests/` para a pasta pública.
+Não registrar corpos das requisições de salas nos logs da hospedagem, pois eles
+podem conter senha ou token. Para códigos de seis dígitos/PIN de quatro,
+reenviar também `api/src/ScoreboardRoomService.php` e frontend/cache v24.
+Não há SQL novo: o schema 005 + 006 já comporta esse formato.
+
+### Extensões
+
 - PHP 8.3;
 - PDO MySQL;
 - cURL;

@@ -18,4 +18,9 @@ return [
         'administrador@exemplo.com',
     ],
     'session_duration_seconds' => 60 * 60 * 24 * 30,
+    // Habilitar somente depois de aplicar as migrações 005 e 006.
+    'scoreboard_rooms' => [
+        'enabled' => false,
+        'ttl_seconds' => 86400,
+    ],
 ];

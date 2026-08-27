@@ -2,6 +2,12 @@
 
 ## Transporte
 
+Exceção: salas auxiliares possuem endpoint independente `api/placar.php`,
+exclusivo do PHP/MySQL, sem autenticação administrativa. Contrato completo em
+[Placar compartilhado](PLACAR_COMPARTILHADO.md#etapa-2--api-exclusiva-do-mysql).
+Esse endpoint exige `application/json` nos POSTs; não usa o transporte de QAS
+descrito abaixo. Implementado no código, ainda aguardando validação no servidor.
+
 - Endpoint PHP: `/sinuca-aec/api/`.
 - GET: ação e parâmetros na query string.
 - POST: JSON enviado como `text/plain;charset=utf-8` para evitar preflight em
@@ -105,6 +111,12 @@ desempate/W.O. `rodadas` tem a mesma divisão por chave; cada rodada contém
 observação.
 
 ## Cache e compatibilidade
+
+Salas auxiliares (`api/placar.php`) não usam o cache do campeonato: códigos
+novos de seis números (`000001`–`999999`), senha de quatro números e reutilização
+atômica de códigos expirados. PIN/código são strings para preservar zeros.
+Desfazer envia uma atualização normal versionada, com o estado anterior.
+Contrato e limites detalhados em `PLACAR_COMPARTILHADO.md`.
 
 Leituras públicas têm cache em memória de 60 segundos. Escritas limpam o cache.
 `salvar_partidas` tenta lote e mantém fallback para várias chamadas

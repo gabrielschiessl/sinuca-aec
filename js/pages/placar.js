@@ -2,6 +2,7 @@ import { renderNavbar } from "../components/navbar.js";
 import { renderFooter } from "../components/footer.js";
 import { withBasePath } from "../config.js";
 import { navigate, resetPageScroll } from "../router.js";
+import { ScoreboardRoom, roomRequest, roomStorageKey, normalizeRoomCode } from "../scoreboardRooms.js";
 
 const STORAGE_KEY = "aec_sinuca_placar";
 const BALLS = [
@@ -22,14 +23,138 @@ let wakeLockRouteHandler = null;
 let tvKeyboardHandler = null;
 let tvRouteHandler = null;
 let tvUndoStack = [];
+let room = null;
+let roomTv = false;
+let localUndoStack = [];
+let lastLocalState = structuredClone(state);
+const blankState = () => ({ names: ["", ""], points: [0, 0], wins: [0, 0], history: [], breakPlayer: 0, strokeScore: 0 });
+const roomEndpoint = () => withBasePath("/api/placar.php");
+window.addEventListener("app:route-rendered", () => {
+  if (!document.querySelector("[data-room-bar]")) { room?.stop(); room = null; }
+});
+
+function prepareRoom(tv) {
+  if (roomTv !== tv) localUndoStack = [];
+  room?.stop(); room = null; roomTv = tv;
+  const code = normalizeRoomCode(new URLSearchParams(location.search).get("sala") || "");
+  state = code ? blankState() : loadState();
+  if (!code) {
+    if (JSON.stringify(state) !== JSON.stringify(lastLocalState)) localUndoStack = [];
+    lastLocalState = structuredClone(state);
+  }
+  if (!code) return;
+  room = new ScoreboardRoom({
+    code, viewer: tv, storage: sessionStorage,
+    request: (payload) => roomRequest(roomEndpoint(), payload),
+    onChange: (current) => {
+      if (room !== current) return;
+      const app = document.getElementById("app");
+      if (current.state) state = structuredClone(current.state);
+      renderState(app); renderRoomBar(app);
+    },
+  });
+}
+
+function mountRoom(app) {
+  renderRoomBar(app);
+  // Capture blocks all editing while viewing/offline/awaiting acknowledgement.
+  const shell = app.querySelector(".scorekeeper-shell, .scorekeeper-tv-shell");
+  shell.addEventListener("click", (event) => {
+    if (room && !room.editable && event.target.closest("[data-score-points], [data-score-penalty], [data-switch-turn], [data-edit-names], [data-reset-frame], [data-finish-frame], [data-finish-match]")) {
+      event.preventDefault(); event.stopImmediatePropagation();
+    }
+  }, true);
+  room?.start();
+}
+
+function renderRoomBar(app) {
+  const bar = app.querySelector("[data-room-bar]");
+  if (!bar) return;
+  const signature = JSON.stringify(room ? [room.code, room.message, !!room.token, room.closed, !!room.pending, room.editable] : null);
+  if (bar.dataset.state === signature) return;
+  bar.dataset.state = signature;
+  bar.innerHTML = room
+    ? `<strong>Sala ${escapeHtml(room.code)}</strong><span role="status">${escapeHtml(room.message)}</span>
+      <div><button type="button" data-room-share>Link da TV</button>
+      ${!roomTv && !room.token && !room.closed ? '<button type="button" data-room-take>Assumir controle</button>' : ""}
+      <button type="button" data-room-leave ${room.pending ? "disabled" : ""}>Sair da sala</button></div>`
+    : `<span>Placar local · somente neste aparelho</span><div>${!roomTv ? '<button type="button" data-room-create>Criar sala</button>' : ""}<button type="button" data-room-join>Entrar em sala</button></div>`;
+  bar.querySelector("[data-room-create]")?.addEventListener("click", () => roomDialog(app, "criar"));
+  bar.querySelector("[data-room-join]")?.addEventListener("click", () => roomDialog(app, "entrar"));
+  bar.querySelector("[data-room-take]")?.addEventListener("click", () => roomDialog(app, "assumir_controle"));
+  bar.querySelector("[data-room-leave]")?.addEventListener("click", () => enterRoom(""));
+  bar.querySelector("[data-room-share]")?.addEventListener("click", () => {
+    const url = new URL(withBasePath("/placar/tv"), location.origin);
+    url.searchParams.set("sala", room.code);
+    openModal(app, `<h2>Acompanhar na TV</h2><p>Abra este link na TV ou entre pelo código. Não compartilhe a senha com espectadores.</p>
+      <div class="scorekeeper-name-fields"><label>Código<input readonly value="${escapeHtml(room.code)}"></label>
+      <label>Link da TV<input readonly value="${escapeHtml(url.href)}" data-room-link></label></div>
+      <div class="scorekeeper-modal-actions"><button class="btn btn-primary" data-modal-close>Fechar</button></div>`, (modal) => {
+        modal.querySelectorAll("input").forEach((input) => input.addEventListener("click", () => input.select()));
+      });
+  });
+  app.querySelectorAll("[data-score-points], [data-score-penalty], [data-switch-turn], [data-edit-names], [data-reset-frame], [data-finish-frame], [data-finish-match], [data-tv-mode]")
+    .forEach((button) => { button.disabled = !!room && (button.hasAttribute("data-tv-mode") ? !!room.pending : !room.editable); });
+}
+
+function enterRoom(code) {
+  const url = new URL(location.href);
+  if (code) url.searchParams.set("sala", code); else url.searchParams.delete("sala");
+  history.replaceState(history.state, "", url);
+  if (roomTv) renderPlacarTv(); else renderPlacar();
+  resetPageScroll();
+}
+
+function roomDialog(app, action) {
+  const creating = action === "criar";
+  const taking = action === "assumir_controle";
+  const currentRoom = room;
+  openModal(app, `<h2>${creating ? "Criar sala" : taking ? "Assumir controle" : "Entrar em sala"}</h2>
+    <p>${creating ? "O placar local atual será copiado para uma sala independente. Guarde a senha para transferir a arbitragem." : taking ? "Ao confirmar, o outro aparelho deixa de controlar esta sala." : "Entre para acompanhar. No telefone, você poderá assumir o controle com a senha depois."}</p>
+    <form data-room-form class="scorekeeper-name-fields">
+      ${!creating && !taking ? '<label>Código da sala (6 números)<input name="codigo" type="text" inputmode="numeric" pattern="[0-9]{6}" required minlength="6" maxlength="6" autocomplete="off" placeholder="000001"></label>' : ""}
+      ${creating || taking ? '<label>Senha da sala (4 números)<input name="senha" type="password" inputmode="numeric" pattern="[0-9]{4}" required minlength="4" maxlength="4" autocomplete="off"></label>' : ""}
+      <p data-room-error role="alert"></p>
+      <div class="scorekeeper-modal-actions"><button class="btn btn-outline" type="button" data-modal-close>Cancelar</button><button class="btn btn-primary" type="submit">Confirmar</button></div>
+    </form>`, (modal) => {
+    const form = modal.querySelector("form");
+    form.querySelectorAll("input").forEach((input) => input.addEventListener("input", () => {
+      input.value = input.value.replace(/[^0-9]/g, "");
+    }));
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = form.querySelector('[type="submit"]');
+      if (button.disabled) return;
+      button.disabled = true;
+      try {
+        let code = taking ? currentRoom.code : normalizeRoomCode(form.elements.codigo?.value || "");
+        if (creating || taking) {
+          const initial = structuredClone(state);
+          initial.names = initial.names.map((name, index) => name || `Jogador ${index + 1}`);
+          const result = await roomRequest(roomEndpoint(), { acao: action, codigo: code, senha: form.elements.senha.value, ...(creating ? { estado: initial } : {}) });
+          code = result.codigo;
+          sessionStorage.setItem(roomStorageKey(code), JSON.stringify({ token: result.controller_token }));
+        } else {
+          await roomRequest(roomEndpoint(), { acao: "consultar", codigo: code });
+        }
+        if (form.isConnected && room === currentRoom) enterRoom(code);
+      } catch (error) {
+        form.querySelector("[data-room-error]").textContent = error.message || "Não foi possível conectar. Tente novamente.";
+        button.disabled = false;
+      }
+    });
+  });
+}
 
 export function renderPlacar() {
+  prepareRoom(false);
   cleanupTvKeyboard();
   const app = document.getElementById("app");
   app.innerHTML = `
     ${renderNavbar({ title: "Placar", hideAdmin: true })}
     <main class="scorekeeper-page">
       <section class="scorekeeper-shell" aria-labelledby="scorekeeper-title">
+        <div class="scorekeeper-room-bar" data-room-bar></div>
         ${scorekeeperPlayer(0)}
 
         <section class="scorekeeper-summary" aria-label="Resumo do jogo">
@@ -57,6 +182,9 @@ export function renderPlacar() {
             <i class="bi bi-arrow-left-right"></i>
             <span>Trocar tacada</span>
           </button>
+          <button class="scorekeeper-switch-turn" type="button" data-undo-action>
+            <i class="bi bi-arrow-counterclockwise"></i><span>Desfazer última ação</span>
+          </button>
         </section>
 
         <nav class="scorekeeper-tools" aria-label="Ferramentas do placar">
@@ -75,17 +203,20 @@ export function renderPlacar() {
   bindEvents(app);
   renderState(app);
   setupScreenWakeLock(app);
-  if (!state.names[0] || !state.names[1]) openNamesModal(app, renderPlacar, true);
+  mountRoom(app);
+  if (!room && (!state.names[0] || !state.names[1])) openNamesModal(app, renderPlacar, true);
 }
 
 export function renderPlacarTv() {
+  prepareRoom(true);
   cleanupTvKeyboard();
   tvUndoStack = [];
   const app = document.getElementById("app");
   app.innerHTML = `
     ${renderNavbar({ title: "Placar", hideAdmin: true })}
-    <main class="scorekeeper-tv-page">
+    <main class="scorekeeper-tv-page${room ? " is-room-viewer" : ""}">
       <section class="scorekeeper-tv-shell" aria-label="Placar para televisão">
+        <div class="scorekeeper-room-bar" data-room-bar></div>
         <div class="scorekeeper-tv-board">
           ${tvPlayer(0)}
 
@@ -107,15 +238,21 @@ export function renderPlacarTv() {
           ${tvPlayer(1)}
         </div>
 
-        <p class="scorekeeper-tv-help-hint"><kbd>/</kbd> Ver botões e ações</p>
+        ${room ? "" : '<p class="scorekeeper-tv-help-hint"><kbd>/</kbd> Ver botões e ações</p>'}
       </section>
       <small class="scorekeeper-tv-copyright">© 2026 Gabriel Schiessl</small>
     </main>
     <div data-scorekeeper-modal></div>`;
 
   renderState(app);
+  if (room) {
+    const logo = app.querySelector(".header .logo");
+    logo?.removeAttribute("data-route");
+    if (logo) logo.style.cursor = "default";
+  }
   bindTvKeyboard(app);
   setupScreenWakeLock(app);
+  mountRoom(app);
 }
 
 function tvPlayer(index) {
@@ -147,6 +284,11 @@ function cleanupTvKeyboard(routeSession = null) {
 
 function handleTvKey(event, app) {
   const key = event.key;
+  // Room TV only accepts native navigation/typing for its room controls.
+  if (room) {
+    if (key === "Escape") closeModal(app);
+    return;
+  }
   const helpOpen = Boolean(app.querySelector("[data-tv-help]"));
   const modalOpen = Boolean(app.querySelector(".scorekeeper-modal-backdrop"));
 
@@ -296,6 +438,7 @@ function finishTvFrame(app) {
 }
 
 function openTvHelp(app) {
+  if (room) return showNotice(app, "TV conectada à sala", "Os pontos são controlados pelo telefone. Nesta TV, o teclado não altera a partida.");
   openModal(app, `<div data-tv-help>
     <div class="scorekeeper-modal-icon"><i class="bi bi-keyboard-fill"></i></div>
     <h2>Controles do placar</h2>
@@ -400,6 +543,15 @@ function maximumDifference(image, name, points, sequence) {
 }
 
 function bindEvents(app) {
+  app.querySelector("[data-undo-action]")?.addEventListener("click", () => {
+    if (room) { room.undo(); return; }
+    const previous = localUndoStack.pop();
+    if (!previous) return;
+    state = structuredClone(previous);
+    lastLocalState = structuredClone(state);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    renderState(app);
+  });
   app.querySelectorAll("[data-score-points]").forEach((button) => button.addEventListener("click", () => {
     addStrokePoints(Number(button.dataset.scorePoints), app);
   }));
@@ -440,6 +592,8 @@ function switchTurn(app) {
 }
 
 function renderState(app) {
+  const undo = app.querySelector("[data-undo-action]");
+  if (undo) undo.disabled = room ? !room.editable || !room.undoStack.length : !localUndoStack.length;
   app.querySelectorAll("[data-player-points]").forEach((element) => {
     element.textContent = state.points[Number(element.dataset.playerPoints)];
   });
@@ -488,9 +642,10 @@ function finishFrame(app) {
 }
 
 function openNamesModal(app, renderAfterSave = renderPlacar, resetOnClose = false) {
+  const version = room?.version;
   openModal(app, `<div class="scorekeeper-modal-icon"><i class="bi bi-people-fill"></i></div>
     <h2>Nome dos jogadores</h2>
-    <p>Os nomes ficam salvos somente neste dispositivo.</p>
+    <p>${room ? "Os nomes serão atualizados para todos os espectadores da sala." : "Os nomes ficam salvos somente neste dispositivo."}</p>
     <div class="scorekeeper-name-fields">
       <label>Jogador 1<input type="text" maxlength="40" value="${escapeHtml(state.names[0])}" data-name-input="0" placeholder="Jogador 1"></label>
       <label>Jogador 2<input type="text" maxlength="40" value="${escapeHtml(state.names[1])}" data-name-input="1" placeholder="Jogador 2"></label>
@@ -500,10 +655,11 @@ function openNamesModal(app, renderAfterSave = renderPlacar, resetOnClose = fals
       modal.querySelector("[data-modal-close]")?.addEventListener("click", resetPageScroll);
     }
     modal.querySelector("[data-save-names]").addEventListener("click", () => {
+      if (room && (!room.editable || version !== room.version)) { closeModal(app); return; }
       state.names = [0, 1].map((index) => modal.querySelector(`[data-name-input="${index}"]`).value.trim() || `Jogador ${index + 1}`);
       saveState();
       closeModal(app);
-      renderAfterSave();
+      if (!room) renderAfterSave();
       if (resetOnClose) resetPageScroll();
     });
   }, Boolean(state.names[0] && state.names[1]));
@@ -534,13 +690,14 @@ function openResultModal(app) {
     modal.querySelector("[data-clear-match]").addEventListener("click", () => confirmAction(app, "Encerrar e limpar o jogo?", "O placar e todo o histórico de partidas serão apagados.", () => {
       state.points = [0, 0]; state.wins = [0, 0]; state.history = [];
       state.breakPlayer = 0; state.strokeScore = 0;
-      saveState(); closeModal(app); renderPlacar();
+      saveState(); closeModal(app); if (!room) renderPlacar();
     }));
   });
 }
 
 function confirmAction(app, title, message, action) {
-  openModal(app, `<div class="scorekeeper-modal-icon is-warning"><i class="bi bi-exclamation-triangle"></i></div><h2>${title}</h2><p>${message}</p><div class="scorekeeper-modal-actions"><button class="btn btn-outline" type="button" data-modal-close>Cancelar</button><button class="btn btn-primary" type="button" data-modal-confirm>Confirmar</button></div>`, (modal) => modal.querySelector("[data-modal-confirm]").addEventListener("click", () => { closeModal(app); action(); }));
+  const version = room?.version;
+  openModal(app, `<div class="scorekeeper-modal-icon is-warning"><i class="bi bi-exclamation-triangle"></i></div><h2>${title}</h2><p>${message}</p><div class="scorekeeper-modal-actions"><button class="btn btn-outline" type="button" data-modal-close>Cancelar</button><button class="btn btn-primary" type="button" data-modal-confirm>Confirmar</button></div>`, (modal) => modal.querySelector("[data-modal-confirm]").addEventListener("click", () => { closeModal(app); if (room && (!room.editable || version !== room.version)) return; action(); }));
 }
 
 function showNotice(app, title, message) {
@@ -555,7 +712,7 @@ function openModal(app, content, setup, dismissible = true) {
   modal.querySelectorAll("[data-modal-close]").forEach((button) => button.addEventListener("click", () => closeModal(app)));
   if (dismissible) backdrop.addEventListener("click", (event) => { if (event.target === backdrop) closeModal(app); });
   setup?.(modal);
-  modal.querySelector("input, button")?.focus();
+  modal.querySelector("input, button")?.focus({ preventScroll: true });
 }
 
 function closeModal(app) {
@@ -580,7 +737,19 @@ function loadState() {
   return { names: ["", ""], points: [0, 0], wins: [0, 0], history: [], breakPlayer: 0, strokeScore: 0 };
 }
 
-function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function saveState() {
+  if (!room) {
+    if (!roomTv && JSON.stringify(lastLocalState) !== JSON.stringify(state)) {
+      localUndoStack.push(structuredClone(lastLocalState));
+      if (localUndoStack.length > 100) localUndoStack.shift();
+    }
+    lastLocalState = structuredClone(state);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); return;
+  }
+  const candidate = structuredClone(state);
+  state = room.state ? structuredClone(room.state) : blankState();
+  room.submit(candidate);
+}
 function validNumber(value) { return Math.max(0, Number.parseInt(value, 10) || 0); }
 function ballAsset(file) { return withBasePath(`/assets/images/regulamento/${file}`); }
 function formatDate(value) { return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value)); }

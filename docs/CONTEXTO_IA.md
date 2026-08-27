@@ -134,20 +134,30 @@ as rodadas das duas divisões da temporada selecionada.
 ## Pontos de atenção antes de alterar
 
 1. Não apagar `appsscript/`: ainda é o QAS alternativo.
-2. Preservar a paridade de contrato entre Apps Script e PHP em toda ação nova.
+2. Preservar a paridade de contrato entre Apps Script e PHP nas funções do
+   campeonato. Salas de placar são uma exceção autorizada, exclusiva do MySQL.
 3. Preservar alterações do usuário em uma árvore Git suja.
 4. Alterações de banco devem ser transacionais e acompanhadas por migração.
 5. Não expor credenciais, e-mails privados, tokens ou dumps.
 6. Validar mobile/Safari; inputs abaixo de 16 px provocam zoom automático no iOS.
 7. As páginas e planilhas têm regras de impressão e responsividade específicas.
 8. Atualizar esta documentação no mesmo trabalho.
-9. O placar usa somente `localStorage`; não cria partidas nem altera dados da API.
+9. O placar local usa `localStorage`; salas opcionais usam PHP/MySQL.
+   Usuário confirmou status online com salas habilitadas. Interface integrada
+   em `/placar` e `/placar/tv`, aguardando envio e validação entre aparelhos.
+   O cliente usa `sessionStorage` para token privado e comando pendente;
+   a TV nunca controla uma sala. Transferência exige a senha da sala.
+   Novas salas usam código numérico de 6 dígitos (000001–999999) reutilizável
+   após expiração, e PIN de exatamente 4 números. `/placar` tem Desfazer
+   última ação, local e sincronizado na sala (até 100 passos do controlador).
+   Salas nunca devem alterar partidas oficiais. Ver `PLACAR_COMPARTILHADO.md`.
 
 ## Pendências conhecidas em 19/08/2026
 
 - A paridade de contrato PHP/Apps Script foi concluída, incluindo ativação,
   ranking, configurações, edição vigente, exportação e regulamento. Alterações
-  futuras precisam modificar e testar os dois backends no mesmo trabalho.
+  futuras precisam modificar e testar os dois backends no mesmo trabalho,
+  exceto salas auxiliares de placar, exclusivas do PHP/MySQL.
 - O QAS busca o modelo DOCX público de produção por padrão. Para testar uma
   versão isolada, configure `REGULATION_TEMPLATE_FILE_ID` com uma cópia no Drive.
 - Os assets binários órfãos identificados durante a limpeza ainda foram

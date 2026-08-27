@@ -5,6 +5,17 @@ código e mantém pendências reais visíveis. Use datas absolutas.
 
 ## Decisões vigentes
 
+### 2026-08-27 — Salas de placar exclusivas do PHP/MySQL
+
+Autorizado pelo usuário não implementar salas em Apps Script, inclusive na
+versão final. O placar local permanece disponível; o modo compartilhado terá
+salas independentes, um controlador e TVs visualizadoras, sem login de ADM ou
+escritas nas partidas oficiais. Implementação em etapas, descrita em
+`PLACAR_COMPARTILHADO.md`. A migração 005 foi confirmada pelo usuário; 006 e
+API estão implementadas e aguardam envio/validação. A transferência por senha
+revoga o token anterior atomicamente; não requer conta Google. Prazo padrão
+de teste: 24 horas renovadas por escrita/transferência, configurável.
+
 ### 2026-08 — PHP/MySQL como produção
 
 O sistema deixou de usar Apps Script/Sheets como backend principal. PHP 8.3 e
@@ -101,6 +112,23 @@ para exclusão.
 - remoção do backend Apps Script.
 
 ## Como registrar nova decisão
+
+### 27/08/2026 — Controle numérico e reversão
+
+Por facilidade de digitação na TV, códigos novos têm seis números e PIN quatro.
+PIN curto exige limites por IP e sala; não usar como autenticação pessoal.
+Códigos expirados podem ser reutilizados, revogando credenciais antigas e sem
+reiniciar versão. Schema existente é suficiente. Adicionado Desfazer por estado
+confirmado em `/placar`, sem permitir reversões do antigo controlador após troca.
+
+### 27/08/2026 — Interface de salas
+
+Salas opcionais preservam o placar local. Token e comando pendente ficam em
+sessionStorage, nunca em links; senha permite recuperar/transferir controle.
+TV conectada a sala é somente visualizadora. Polling de 2s com recuo e uma
+escrita por vez evita duplicação; sem confirmação não há nova pontuação.
+Cliente testado com transporte simulado; testes MySQL e Safari/TV continuam
+pendentes. Reversão operacional: usar `/placar` sem `?sala=` (modo local).
 
 Inclua data, contexto, decisão, alternativas rejeitadas, consequências e, se
 aplicável, plano de reversão. Não apague decisões antigas: marque-as como
