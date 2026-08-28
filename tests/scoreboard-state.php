@@ -14,11 +14,17 @@ use AecSinuca\ApiException;
 use AecSinuca\ScoreboardState;
 
 $base = ['names' => ['Jogador 1', 'Jogador 2'], 'points' => [12, 7],
-    'wins' => [1, 0], 'history' => [], 'breakPlayer' => 0, 'strokeScore' => 5];
+    'wins' => [1, 0], 'history' => [], 'breakPlayer' => 0, 'strokeScore' => 5, 'firstStarter' => null];
 if (ScoreboardState::normalize($base) !== $base) {
     throw new RuntimeException('Estado válido alterado inesperadamente.');
 }
 $frame = ['date' => '2026-08-27T12:00:00.000Z', 'points' => [12, 7], 'winner' => 0];
+$legacy = $base;
+unset($legacy['firstStarter']);
+if (ScoreboardState::normalize($legacy)['firstStarter'] !== null) throw new RuntimeException('Compatibilidade da saída.');
+foreach ([0, 1] as $starter) {
+    if (ScoreboardState::normalize(array_replace($base, ['firstStarter' => $starter]))['firstStarter'] !== $starter) throw new RuntimeException('Saída não preservada.');
+}
 $validHistory = $base;
 $validHistory['history'] = [$frame];
 ScoreboardState::normalize($validHistory);
@@ -30,6 +36,8 @@ $invalid = [
     array_replace($base, ['wins' => [0, 10000]]),
     array_replace($base, ['strokeScore' => 1.5]),
     array_replace($base, ['breakPlayer' => 2]),
+    array_replace($base, ['firstStarter' => 2]),
+    array_replace($base, ['firstStarter' => '0']),
     array_replace($base, ['names' => ['', 'B']]),
     array_replace($base, ['names' => [str_repeat('A', 41), 'B']]),
     array_replace($base, ['names' => ["A\nB", 'B']]),
@@ -45,4 +53,4 @@ foreach ($invalid as $index => $state) {
     }
     throw new RuntimeException('Caso inválido aceito: ' . $index);
 }
-echo "OK: estado válido, histórico e 12 casos inválidos.\n";
+echo "OK: estado válido, saída, legado, histórico e casos inválidos.\n";

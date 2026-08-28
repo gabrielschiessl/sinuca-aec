@@ -113,7 +113,9 @@ receber `controle_ativo: false`, mas qualquer escrita com ele é recusada (403).
 
 `estado` tem exatamente os dados auxiliares atuais: `names` (dois nomes de
 1–40 caracteres), `points` (dois inteiros 0–999999), `wins` (0–9999),
-`breakPlayer` (0 ou 1), `strokeScore` (0–999999), `history` (até 500 partidas).
+`breakPlayer` (0 ou 1), `strokeScore` (0–999999), `history` (até 500 partidas),
+`firstStarter` (null: não definido; 0/1: quem saiu na primeira partida).
+Estados antigos sem `firstStarter` são aceitos como null. Não exige migração SQL.
 Cada partida do histórico tem `date` (ISO UTC com milissegundos), `points` e
 `winner` (0 ou 1), coerente com o maior placar. Campos não reconhecidos são
 descartados. A interface deve escapar nomes ao renderizar.
@@ -183,6 +185,23 @@ rotaciona a chave; não fazer tentativas concorrentes de assumir controle.
 - Nenhuma operação da sala grava partidas oficiais, ranking ou temporadas.
 
 ## Códigos reutilizáveis e desfazer
+
+### Saída alternada
+
+Em `/placar`, abaixo da sala, “Quem saiu primeiro?” usa os nomes atuais.
+Padrão Não definido preserva a tacada existente e oculta os indicadores.
+Quando definido, saída = (firstStarter + soma das partidas vencidas) módulo 2.
+Finalizar uma partida inicia a tacada do próximo a sair, independente do vencedor.
+Trocas de tacada/faltas e reinício somente dos pontos não alternam a saída.
+Limpar o jogo mantém a escolha e retorna à primeira saída; desfazer restaura o
+snapshot anterior. Alterar a escolha durante pontos em andamento só corrige a
+saída indicada, sem interromper a tacada; com pontos/tacada zerados, aplica-a já.
+Celular mostra bola branca e SAÍDA abaixo do nome; a seta de tacada ocupa a
+mesma linha do nome, sem ser centralizada junto ao indicador SAÍDA. TV mostra SAÍDA acima de
+Tacada com apenas a seta voltada ao jogador correspondente. Tudo acompanha a
+sala e transferência de controle. Só o controlador pode alterar a seleção.
+Publicar também `js/scoreboardOpening.js`, `api/src/ScoreboardState.php` e
+`assets/images/regulamento/BallIcon.svg`, além do placar, CSS e service worker.
 
 O gerador tenta códigos aleatórios; colisão com sala ativa nunca a sobrescreve.
 Colisão com sala expirada substitui atomicamente estado, senha e token, limpa

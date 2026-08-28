@@ -738,7 +738,15 @@
 .scorekeeper-player.is-active { border-color:var(--tab-accent); box-shadow:0 0 0 2px rgba(171,41,89,.09); }
 .scorekeeper-player-turn { display:grid; place-items:center; width:18px; color:transparent; font-size:1rem; font-weight:900; }
 .scorekeeper-player.is-active .scorekeeper-player-turn { color:var(--tab-accent); }
-.scorekeeper-player-score { display:grid; grid-template-columns:18px minmax(0,1fr) auto; align-items:center; gap:10px; }
+.scorekeeper-player-score { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:10px; }
+.scorekeeper-player-identity { min-width:0; display:grid; grid-template-columns:18px minmax(0,1fr); align-items:center; column-gap:10px; }
+.scorekeeper-player-identity .scorekeeper-opening-badge { grid-column:2; }
+.scorekeeper-opening-select { display:grid; gap:6px; margin:0 0 16px; color:var(--text-muted); font-size:.85rem; }
+.scorekeeper-opening-select select { width:100%; min-width:0; padding:10px 12px; border:1px solid var(--border-highlight); border-radius:8px; background:var(--surface-darkest); color:white; font:inherit; font-size:16px; }
+.scorekeeper-opening-select select:disabled { opacity:.5; }
+.scorekeeper-opening-badge { display:flex; align-items:center; gap:5px; margin-top:5px; color:white; font-size:.75rem; font-weight:700; }
+.scorekeeper-opening-badge img { width:16px; height:16px; object-fit:contain; filter:brightness(0) invert(1); }
+.scorekeeper-opening-badge[hidden], .scorekeeper-tv-opening[hidden] { display:none; }
 .scorekeeper-player-score h2 { min-width:0; margin:0; overflow-wrap:anywhere; color:white; font-size:clamp(1.15rem,4vw,1.55rem); }
 .scorekeeper-player.is-active .scorekeeper-player-score h2 { color:var(--tab-accent); }
 .scorekeeper-player-score > strong { flex:0 0 auto; min-width:82px; color:white; font-size:clamp(2.8rem,10vw,4.8rem); font-weight:900; line-height:1; text-align:right; font-variant-numeric:tabular-nums; }
@@ -924,6 +932,8 @@
   line-height:1.15;
   white-space:nowrap;
 }
+.scorekeeper-tv-opening { display:flex; align-items:center; justify-content:center; gap:.4em; color:white; font-size:clamp(1.05rem,1.9vw,1.8rem); }
+.scorekeeper-tv-opening span { margin:0; color:white; }
 .scorekeeper-tv-stroke-score { width:100%; }
 .scorekeeper-tv-stroke-score strong {
   display:grid;

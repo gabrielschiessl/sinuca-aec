@@ -18,6 +18,17 @@
 
 ## Configuração PHP
 
+### Endereços inexistentes
+
+Publicar o `.htaccess` do projeto **dentro de `/sinuca-aec/`**, nunca substituindo
+o `.htaccess` raiz do WordPress. Com mod_rewrite/AllowOverride habilitados,
+GET/HEAD com Accept text/html para página inexistente (ex.: `/sinuca-aec/placa`)
+recebe 302 para `/sinuca-aec/`, descartando query string. Arquivos/diretórios
+existentes e caminhos técnicos (API/assets/CSS/JS etc.) mantêm seu tratamento.
+O router também corrige URLs inválidas quando a SPA já foi carregada.
+Enviar `js/router.js` e `service-worker.js` junto. Validar no Apache/cPanel;
+Live Server não interpreta regras `.htaccess`.
+
 Copie `api/config.example.php` para `api/config.local.php` somente no servidor:
 
 ```php

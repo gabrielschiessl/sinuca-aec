@@ -57,6 +57,10 @@ Não publicar `.git`, `.tmp`, `tmp`, `outputs`, dumps ou backups.
 
 Cada pasta de rota contém um `index.html` que redireciona para a SPA mantendo a
 URL amigável. O `404.html` reconstrói a rota quando a hospedagem entrega 404.
+No Apache, o `.htaccess` dentro de `/sinuca-aec/` redireciona navegacoes HTML
+para paginas inexistentes à Home (302). API, recursos tecnicos, arquivos e
+diretorios existentes nao sao interceptados. O router também normaliza rotas
+desconhecidas para a URL da Home, sem manter parametros da rota invalida.
 `manifest.webmanifest` e `service-worker.js` cuidam da instalação PWA e do
 fallback conservador do casco estático; a API não é interceptada pelo worker.
 
@@ -151,6 +155,9 @@ as rodadas das duas divisões da temporada selecionada.
    após expiração, e PIN de exatamente 4 números. `/placar` tem Desfazer
    última ação, local e sincronizado na sala (até 100 passos do controlador).
    Salas nunca devem alterar partidas oficiais. Ver `PLACAR_COMPARTILHADO.md`.
+   O seletor Quem saiu primeiro? (`firstStarter`: null/0/1) alterna a saída
+   pela soma das partidas finalizadas, não pela tacada nem pelo vencedor.
+   Indicadores no celular/TV e escolha são sincronizados na sala; sem migração SQL.
 
 ## Pendências conhecidas em 19/08/2026
 

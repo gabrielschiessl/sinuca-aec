@@ -63,11 +63,13 @@ try {
     check($transfer['controller_token'] !== $first['controller_token'], 'Token não foi rotacionado.');
     $state['points'][0] = 7;
     $state['strokeScore'] = 7;
+    $state['firstStarter'] = 1;
     $write = ['codigo' => $first['codigo'], 'controller_token' => $first['controller_token'],
         'versao' => $transfer['versao'], 'comando_id' => '00000000-0000-4000-8000-000000000001', 'estado' => $state];
     rejects(fn () => $call('atualizar', $write), 403);
     $write['controller_token'] = $transfer['controller_token'];
     $saved = $call('atualizar', $write);
+    check($saved['estado']['firstStarter'] === 1, 'Saída não preservada pela sala.');
     $repeat = $call('atualizar', $write);
     check($repeat['repetido'] && $repeat['versao'] === $saved['versao'], 'Repetição alterou pontos/versão.');
     rejects(fn () => $call('atualizar', array_replace($write, ['comando_id' => '00000000-0000-4000-8000-000000000002'])), 409);

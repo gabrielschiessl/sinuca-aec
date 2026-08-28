@@ -3,6 +3,7 @@ import { renderFooter } from "../components/footer.js";
 import { withBasePath } from "../config.js";
 import { navigate, resetPageScroll } from "../router.js";
 import { ScoreboardRoom, roomRequest, roomStorageKey, normalizeRoomCode } from "../scoreboardRooms.js";
+import { openingPlayer, applyOpening } from "../scoreboardOpening.js";
 
 const STORAGE_KEY = "aec_sinuca_placar";
 const BALLS = [
@@ -27,7 +28,7 @@ let room = null;
 let roomTv = false;
 let localUndoStack = [];
 let lastLocalState = structuredClone(state);
-const blankState = () => ({ names: ["", ""], points: [0, 0], wins: [0, 0], history: [], breakPlayer: 0, strokeScore: 0 });
+const blankState = () => ({ names: ["", ""], points: [0, 0], wins: [0, 0], history: [], breakPlayer: 0, strokeScore: 0, firstStarter: null });
 const roomEndpoint = () => withBasePath("/api/placar.php");
 window.addEventListener("app:route-rendered", () => {
   if (!document.querySelector("[data-room-bar]")) { room?.stop(); room = null; }
@@ -155,6 +156,12 @@ export function renderPlacar() {
     <main class="scorekeeper-page">
       <section class="scorekeeper-shell" aria-labelledby="scorekeeper-title">
         <div class="scorekeeper-room-bar" data-room-bar></div>
+        <label class="scorekeeper-opening-select">Quem saiu primeiro?
+          <select data-first-starter aria-label="Quem saiu primeiro?">
+            <option value="">Não definido</option>
+            <option value="0">Jogador 1</option><option value="1">Jogador 2</option>
+          </select>
+        </label>
         ${scorekeeperPlayer(0)}
 
         <section class="scorekeeper-summary" aria-label="Resumo do jogo">
@@ -221,6 +228,11 @@ export function renderPlacarTv() {
           ${tvPlayer(0)}
 
           <section class="scorekeeper-tv-summary" aria-label="Resumo do jogo">
+            <div class="scorekeeper-tv-opening" data-tv-opening hidden>
+              <i class="bi bi-caret-left-fill" data-opening-arrow="0" aria-hidden="true"></i>
+              <span>Saída</span>
+              <i class="bi bi-caret-right-fill" data-opening-arrow="1" aria-hidden="true"></i>
+            </div>
             <div class="scorekeeper-tv-stroke-score">
               <span>Tacada</span>
               <strong data-tv-stroke>${state.strokeScore}</strong>
@@ -342,6 +354,7 @@ function handleTvKey(event, app) {
       state.history = [];
       state.breakPlayer = 0;
       state.strokeScore = 0;
+      applyOpening(state);
     });
     return;
   }
@@ -434,6 +447,7 @@ function finishTvFrame(app) {
     state.history.push({ date: new Date().toISOString(), points: [first, second], winner });
     state.points = [0, 0];
     state.strokeScore = 0;
+    applyOpening(state);
   });
 }
 
@@ -517,8 +531,11 @@ function cleanupScreenWakeLock() {
 function scorekeeperPlayer(index) {
   return `<article class="scorekeeper-player" data-player="${index}">
     <div class="scorekeeper-player-score">
-      <span class="scorekeeper-player-turn" aria-hidden="true"><i class="bi bi-play-fill"></i></span>
-      <h2 data-player-name="${index}">${escapeHtml(state.names[index] || `Jogador ${index + 1}`)}</h2>
+      <div class="scorekeeper-player-identity">
+        <span class="scorekeeper-player-turn" aria-hidden="true"><i class="bi bi-play-fill"></i></span>
+        <h2 data-player-name="${index}">${escapeHtml(state.names[index] || `Jogador ${index + 1}`)}</h2>
+        <span class="scorekeeper-opening-badge" data-opening-player="${index}" hidden><img src="${ballAsset("BallIcon.svg")}" alt=""> SAÍDA</span>
+      </div>
       <strong data-player-points="${index}">${state.points[index]}</strong>
     </div>
   </article>`;
@@ -543,6 +560,14 @@ function maximumDifference(image, name, points, sequence) {
 }
 
 function bindEvents(app) {
+  app.querySelector("[data-first-starter]")?.addEventListener("change", (event) => {
+    if (room && !room.editable) { renderState(app); return; }
+    state.firstStarter = event.target.value === "" ? null : Number(event.target.value);
+    // Correção da configuração durante uma partida não interrompe a tacada em curso.
+    if (state.points.every((points) => points === 0) && state.strokeScore === 0) applyOpening(state);
+    saveState();
+    renderState(app);
+  });
   app.querySelector("[data-undo-action]")?.addEventListener("click", () => {
     if (room) { room.undo(); return; }
     const previous = localUndoStack.pop();
@@ -592,6 +617,26 @@ function switchTurn(app) {
 }
 
 function renderState(app) {
+  const starter = openingPlayer(state);
+  const select = app.querySelector("[data-first-starter]");
+  if (select) {
+    [0, 1].forEach((index) => {
+      select.options[index + 1].textContent = state.names[index] || `Jogador ${index + 1}`;
+    });
+    select.value = state.firstStarter === 0 || state.firstStarter === 1 ? String(state.firstStarter) : "";
+    select.disabled = !!room && !room.editable;
+  }
+  app.querySelectorAll("[data-opening-player]").forEach((element) => {
+    element.hidden = Number(element.dataset.openingPlayer) !== starter;
+  });
+  const tvOpening = app.querySelector("[data-tv-opening]");
+  if (tvOpening) {
+    tvOpening.hidden = starter === null;
+    tvOpening.setAttribute("aria-label", starter === null ? "Saída não definida" : `Saída: ${state.names[starter] || `Jogador ${starter + 1}`}`);
+    tvOpening.querySelectorAll("[data-opening-arrow]").forEach((arrow) => {
+      arrow.style.visibility = Number(arrow.dataset.openingArrow) === starter ? "visible" : "hidden";
+    });
+  }
   const undo = app.querySelector("[data-undo-action]");
   if (undo) undo.disabled = room ? !room.editable || !room.undoStack.length : !localUndoStack.length;
   app.querySelectorAll("[data-player-points]").forEach((element) => {
@@ -636,6 +681,7 @@ function finishFrame(app) {
     state.history.push({ date: new Date().toISOString(), points: [first, second], winner });
     state.points = [0, 0];
     state.strokeScore = 0;
+    applyOpening(state);
     saveState();
     renderState(app);
   });
@@ -690,6 +736,7 @@ function openResultModal(app) {
     modal.querySelector("[data-clear-match]").addEventListener("click", () => confirmAction(app, "Encerrar e limpar o jogo?", "O placar e todo o histórico de partidas serão apagados.", () => {
       state.points = [0, 0]; state.wins = [0, 0]; state.history = [];
       state.breakPlayer = 0; state.strokeScore = 0;
+      applyOpening(state);
       saveState(); closeModal(app); if (!room) renderPlacar();
     }));
   });
@@ -731,10 +778,11 @@ function loadState() {
         history: Array.isArray(saved.history) ? saved.history : [],
         breakPlayer: Number(saved.breakPlayer) === 1 ? 1 : 0,
         strokeScore: validNumber(saved.strokeScore),
+        firstStarter: saved.firstStarter === 0 || saved.firstStarter === 1 ? saved.firstStarter : null,
       };
     }
   } catch {}
-  return { names: ["", ""], points: [0, 0], wins: [0, 0], history: [], breakPlayer: 0, strokeScore: 0 };
+  return { names: ["", ""], points: [0, 0], wins: [0, 0], history: [], breakPlayer: 0, strokeScore: 0, firstStarter: null };
 }
 
 function saveState() {

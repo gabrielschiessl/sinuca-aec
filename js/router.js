@@ -26,6 +26,11 @@ const routes = {
 export function router() {
   const path = withoutBasePath();
 
+  // Fallback para navegacao interna e hospedagens que entregam a SPA no 404.
+  if (!Object.hasOwn(routes, path)) {
+    window.history.replaceState({}, "", withBasePath("/"));
+    resetPageScroll();
+  }
   const page = routes[path] || renderHome;
 
   page();

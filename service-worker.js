@@ -1,4 +1,4 @@
-const CACHE_NAME = "aec-sinuca-shell-v25";
+const CACHE_NAME = "aec-sinuca-shell-v28";
 const APP_ROOT = new URL("./", self.location).pathname;
 const APP_SHELL = [
   APP_ROOT,

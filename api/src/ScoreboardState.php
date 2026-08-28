@@ -54,6 +54,7 @@ final class ScoreboardState
             'history' => $frames,
             'breakPlayer' => self::integer($value['breakPlayer'] ?? null, 1),
             'strokeScore' => self::integer($value['strokeScore'] ?? null, 999999),
+            'firstStarter' => isset($value['firstStarter']) ? self::integer($value['firstStarter'], 1) : null,
         ];
     }
 

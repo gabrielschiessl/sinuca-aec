@@ -11,6 +11,12 @@ função testável e acompanhada por teste automatizado futuro.
 
 ### Repositório
 
+Roteamento no cPanel: abrir `/sinuca-aec/placa` e um caminho inválido aninhado;
+ambos devem terminar em `/sinuca-aec/`. Conferir `/serie-a`, `/placar/tv`, API
+e arquivos estáticos existentes sem redirecionamento indevido; caminhos de API
+ou assets inexistentes não devem virar HTML da Home. Conferir também o WordPress
+fora de `/sinuca-aec/`, que não recebe regras novas.
+
 ```powershell
 git status --short
 git diff --check
@@ -30,6 +36,13 @@ ambiente com PHP. A máquina de desenvolvimento pode não possuir PHP local; nes
 caso declarar a limitação e validar em QAS/servidor antes de produção.
 
 ### Salas do placar — testes adicionados
+
+- `node tests/scoreboard-opening.mjs`: alternância independente do vencedor,
+  Não definido/legado, troca de tacada e reset. Validar em iPhone/TV: selecionar
+  cada jogador, finalizar duas partidas, desfazer, renomear e recarregar; conferir
+  indicadores e transferência de sala. API deve persistir `firstStarter`.
+  Nesta alteração os testes Node passaram; a verificação visual ficou pendente
+  porque a conexão do navegador falhou ao iniciar. PHP não disponível localmente.
 
 - `node tests/scoreboard-client.mjs`: passou em 27/08/2026. Transporte simulado:
   serialização, resposta perdida, recuperação após recarga, retry imutável,
